@@ -8,7 +8,7 @@ const CACHE_NAME = 'ride-v3';
 // Files to cache on install — the "app shell"
 const SHELL_FILES = [
   './',
-  './r-ide.html',
+  './index.html',
   './icon-192.png',
   './icon-512.png'
 ];
