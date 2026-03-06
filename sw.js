@@ -3,12 +3,13 @@
    WebR's own WASM/package files are handled by WebR itself.
 */
 
-const CACHE_NAME = 'ride-v3';
+const CACHE_NAME = 'ride-v4';
 
 // Files to cache on install — the "app shell"
 const SHELL_FILES = [
   './',
   './index.html',
+  './coi-serviceworker.js',
   './icon-192.png',
   './icon-512.png'
 ];
