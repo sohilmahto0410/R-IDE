@@ -1,0 +1,1585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#141218">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="R-IDE">
+<title>R-IDE</title>
+<link rel="manifest" href="/manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Google+Sans+Display:wght@400;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ── M3 EXPRESSIVE DARK TOKENS ── */
+:root{
+  --pri:#D0BCFF; --on-pri:#381E72; --pri-con:#4F378B; --on-pri-con:#EADDFF;
+  --ter:#86EFAC; --err:#F2B8B5;
+  --bg:#141218; --surf:#141218; --s1:#1D1B20; --s2:#211F26; --s3:#2B2930; --s4:#36343B;
+  --on-s:#E6E1E5; --on-sv:#CAC4D0; --out:#938F99; --outv:#49454F;
+  --code-bg:#0E0D12; --code-fg:#C5CDE8; --lnum-bg:#0B0A0F; --lnum-fg:#3E3A52;
+  --r-xl:28px; --r-lg:16px; --r-md:12px; --r-sm:8px;
+  --spring:cubic-bezier(.34,1.56,.64,1);
+  --smooth:cubic-bezier(.4,0,.2,1);
+  --decel:cubic-bezier(0,0,.2,1);
+  --lnum-w:46px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{height:100%;background:#141218;overscroll-behavior:none}
+body{height:100%;overflow:hidden;background:#141218;color:var(--on-s);
+  font-family:'Google Sans',system-ui,sans-serif;font-size:14px;overscroll-behavior:none}
+/* Fixed shell — covers full physical screen, background seals any gap */
+#app-shell{position:fixed;top:0;left:0;right:0;bottom:0;
+  background:#141218;display:flex;flex-direction:column;overflow:hidden}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--outv);border-radius:2px}
+
+/* ── LOADING ── */
+#lo{position:fixed;inset:0;background:var(--bg);z-index:9999;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
+  transition:opacity .4s var(--smooth)}
+#lo.gone{opacity:0;pointer-events:none}
+.lo-icon{width:72px;height:72px;border-radius:24px;
+  background:linear-gradient(135deg,var(--pri-con),#7C3AED);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:32px;color:#fff;
+  box-shadow:0 8px 32px rgba(208,188,255,.35);
+  animation:loFlt 2s ease-in-out infinite}
+@keyframes loFlt{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-8px) rotate(-2deg)}}
+.lo-title{font-family:'Google Sans Display',sans-serif;font-size:22px;font-weight:700}
+.lo-sub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--on-sv);
+  text-align:center;line-height:1.6;max-width:280px}
+.lo-track{width:220px;height:4px;background:var(--s4);border-radius:2px;overflow:hidden}
+.lo-fill{height:100%;background:linear-gradient(90deg,var(--pri-con),var(--pri));
+  width:0%;border-radius:2px;transition:width .5s var(--smooth)}
+
+/* ── HEADER ── */
+#hdr{height:52px;background:var(--s1);border-bottom:1px solid var(--outv);
+  display:flex;align-items:center;padding:0 14px;gap:8px;z-index:20;position:relative;
+  box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.logo{display:flex;align-items:center;gap:9px}
+.logo-chip{width:32px;height:32px;border-radius:10px;
+  background:linear-gradient(135deg,var(--pri-con),#7C3AED);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;color:#fff;
+  box-shadow:0 2px 8px rgba(208,188,255,.3);flex-shrink:0}
+.logo-name{font-family:'Google Sans Display',sans-serif;font-size:18px;font-weight:700;letter-spacing:-.3px}
+.logo-name em{color:var(--pri);font-style:normal}
+.sp{flex:1}
+#status{display:flex;align-items:center;gap:6px;
+  font-family:'JetBrains Mono',monospace;font-size:10.5px;
+  padding:4px 11px;border-radius:20px;background:var(--s3);border:1px solid var(--outv);
+  transition:all .3s var(--smooth)}
+#sdot{width:7px;height:7px;border-radius:50%;background:var(--out);transition:background .3s;flex-shrink:0}
+.s-load #sdot{background:var(--pri);animation:pulse .9s ease-in-out infinite}
+.s-ok   #sdot{background:var(--ter)}
+.s-run  #sdot{background:#60A5FA;animation:pulse .5s ease-in-out infinite}
+.s-err  #sdot{background:var(--err)}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.5)}}
+
+/* ── NAV ── */
+#nav{height:46px;background:var(--s1);border-bottom:1px solid var(--outv);
+  display:flex;overflow-x:auto;scrollbar-width:none;position:relative;z-index:15}
+#nav::-webkit-scrollbar{display:none}
+.nt{flex-shrink:0;height:100%;padding:0 14px;font-family:'Google Sans',sans-serif;
+  font-size:12px;font-weight:500;color:var(--on-sv);background:transparent;border:none;
+  border-bottom:2.5px solid transparent;cursor:pointer;
+  transition:color .2s var(--smooth),border-color .2s var(--smooth),background .2s;
+  display:flex;align-items:center;gap:5px;letter-spacing:.3px;position:relative}
+.nt:hover{color:var(--on-s);background:rgba(208,188,255,.06)}
+.nt.on{color:var(--pri);border-bottom-color:var(--pri);background:rgba(208,188,255,.07)}
+.nbadge{width:6px;height:6px;border-radius:50%;background:var(--pri);
+  display:none;animation:badgePop .3s var(--spring)}
+.has-badge .nbadge{display:inline-block}
+@keyframes badgePop{0%{transform:scale(0)}100%{transform:scale(1)}}
+
+/* ── PANES ── */
+#main{flex:1;overflow:hidden;position:relative;min-height:0}
+.pane{position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden;
+  opacity:0;transform:translateY(10px);pointer-events:none;
+  transition:opacity .22s var(--smooth),transform .22s var(--decel)}
+.pane.on{opacity:1;transform:translateY(0);pointer-events:all}
+
+/* ── BUTTONS ── */
+.btn{padding:6px 14px;border-radius:20px;border:none;cursor:pointer;
+  font-family:'Google Sans',sans-serif;font-size:12px;font-weight:500;
+  display:flex;align-items:center;gap:5px;white-space:nowrap;
+  transition:all .2s var(--smooth);position:relative;overflow:hidden}
+.btn:active{transform:scale(.94)}
+.btn:disabled{opacity:.38;cursor:not-allowed}
+.btn-fill{background:var(--pri-con);color:var(--on-pri-con)}
+.btn-fill:hover{box-shadow:0 2px 10px rgba(208,188,255,.3)}
+.btn-tonal{background:var(--s3);color:var(--on-s);border:1px solid var(--outv)}
+.btn-tonal:hover{border-color:var(--out)}
+.btn-out{background:transparent;color:var(--pri);border:1px solid var(--outv)}
+.btn-run{background:linear-gradient(135deg,var(--pri-con),#7C3AED);color:#fff;
+  font-weight:700;box-shadow:0 2px 12px rgba(208,188,255,.22);
+  transition:all .25s var(--spring)}
+.btn-run:hover{transform:scale(1.05);box-shadow:0 4px 20px rgba(208,188,255,.38)}
+.btn-run:active{transform:scale(.97)}
+.btn-danger{background:rgba(242,184,181,.1);color:var(--err);border:1px solid rgba(242,184,181,.2)}
+.btn-danger:hover{background:rgba(242,184,181,.18)}
+.btn-icon{width:32px;height:32px;padding:0;justify-content:center;border-radius:50%;
+  font-size:14px;background:var(--s3);color:var(--on-s);border:1px solid var(--outv)}
+.btn-icon:hover{border-color:var(--out)}
+
+/* ── EDITOR PANE ── */
+#etb{background:var(--s2);border-bottom:1px solid var(--outv);
+  padding:6px 10px;display:flex;align-items:center;gap:6px;flex-shrink:0;overflow:hidden}
+.etb-icon{width:32px;height:32px;padding:0;justify-content:center;font-size:16px;flex-shrink:0}
+/* line numbers + editor */
+#ewrap{position:relative;flex:1;display:flex;overflow:hidden}
+#lnum-col{width:var(--lnum-w);background:var(--lnum-bg);border-right:1px solid var(--outv);
+  overflow:hidden;flex-shrink:0;position:relative;user-select:none}
+#lnums{position:absolute;top:0;right:0;
+  padding:14px 8px 200px 4px;
+  font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.7;
+  color:var(--lnum-fg);text-align:right;white-space:pre;pointer-events:none;
+  will-change:transform}
+.lnum-active{color:var(--pri);font-weight:500}
+/* Syntax highlight container */
+#ed-container{flex:1;position:relative;overflow:hidden;background:var(--code-bg)}
+/* Highlight pre — sits behind textarea */
+#hl{position:absolute;inset:0;margin:0;padding:14px 16px 200px;
+  font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.7;
+  white-space:pre;tab-size:2;overflow:hidden;pointer-events:none;
+  word-break:normal;color:var(--code-fg);background:transparent;border:none}
+#ed{position:absolute;inset:0;background:transparent;color:transparent;
+  font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.7;
+  border:none;outline:none;padding:14px 16px;resize:none;overflow:auto;
+  white-space:pre;tab-size:2;caret-color:var(--pri);
+  -webkit-overflow-scrolling:touch;z-index:1;}
+
+/* ── AUTOCOMPLETE ── */
+#ac{position:absolute;background:var(--s3);border:1px solid var(--outv);
+  border-radius:var(--r-lg);box-shadow:0 8px 32px rgba(0,0,0,.65);
+  z-index:300;display:none;flex-direction:column;overflow:hidden;
+  min-width:270px;max-width:350px;
+  animation:acIn .17s var(--spring)}
+@keyframes acIn{from{transform:translateY(-6px) scale(.96);opacity:0}to{transform:none;opacity:1}}
+#ac-list{max-height:168px;overflow-y:auto}
+.ac-item{padding:6px 11px;font-family:'JetBrains Mono',monospace;font-size:11.5px;
+  color:var(--on-s);cursor:pointer;display:flex;align-items:center;gap:7px;
+  border-left:3px solid transparent;transition:background .1s}
+.ac-item:hover,.ac-item.sel{background:rgba(208,188,255,.12);border-left-color:var(--pri)}
+.ac-ic{width:17px;height:17px;border-radius:4px;display:flex;align-items:center;
+  justify-content:center;font-size:9px;font-weight:700;flex-shrink:0}
+.ac-ic.fn  {background:rgba(96,165,250,.2);color:#60A5FA}
+.ac-ic.plot{background:rgba(134,239,172,.2);color:var(--ter)}
+.ac-ic.pkg {background:rgba(167,139,250,.2);color:#A78BFA}
+.ac-ic.ctrl{background:rgba(251,191,36,.2);color:#FBBF24}
+.ac-ic.val {background:rgba(248,113,113,.2);color:#F87171}
+.ac-ic.var {background:rgba(251,146,60,.2);color:#FB923C}
+.ac-nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ac-ty{font-size:9px;color:var(--out);flex-shrink:0}
+#ac-detail{border-top:1px solid var(--outv);padding:7px 11px;background:var(--s4);
+  font-family:'JetBrains Mono',monospace;font-size:10.5px;line-height:1.55;display:none}
+#ac-sig{color:#60A5FA;margin-bottom:3px;word-break:break-all}
+#ac-desc{color:var(--on-sv)}
+
+/* ── CONSOLE ── */
+#cout{flex:1;overflow-y:auto;padding:11px 14px;
+  font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.75;
+  background:var(--code-bg);-webkit-overflow-scrolling:touch}
+.ol{margin:0;white-space:pre-wrap;word-break:break-word;
+  animation:olIn .13s var(--smooth)}
+@keyframes olIn{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}
+.ol.inf{color:var(--out);font-style:italic}.ol.res{color:var(--code-fg)}
+.ol.err{color:var(--err)}.ol.wrn{color:#FBBF24}.ol.ok{color:var(--ter)}
+.ol.cmd{color:#60A5FA}.ol.sep{border-top:1px solid var(--outv);margin:5px 0;height:0;animation:none}
+#replbar{display:flex;align-items:center;background:var(--s2);
+  border-top:1px solid var(--outv);padding:7px 12px;gap:7px;flex-shrink:0}
+.rp{font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--pri);flex-shrink:0}
+#ri{flex:1;background:transparent;border:none;outline:none;color:var(--on-s);
+  font-family:'JetBrains Mono',monospace;font-size:12px;caret-color:var(--pri)}
+
+/* ── PLOTS ── */
+#ptb{display:flex;gap:7px;padding:7px 10px;background:var(--s2);
+  border-bottom:1px solid var(--outv);flex-shrink:0;align-items:center;flex-wrap:wrap}
+#pcnt{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--out);margin-left:auto}
+/* zoom bar */
+#zoom-bar{display:flex;align-items:center;gap:6px;padding:5px 10px;
+  background:var(--s1);border-bottom:1px solid var(--outv);flex-shrink:0}
+#zoom-val{font-family:'JetBrains Mono',monospace;font-size:11px;
+  color:var(--on-sv);min-width:38px;text-align:center}
+.zoom-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--outv);
+  background:var(--s3);color:var(--on-s);font-size:16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .2s var(--spring);flex-shrink:0;font-weight:700;line-height:1}
+.zoom-btn:hover{border-color:var(--pri);color:var(--pri);transform:scale(1.1)}
+.zoom-btn:active{transform:scale(.9)}
+/* plot chip tabs */
+#plot-tabs{display:flex;align-items:center;gap:6px;padding:7px 10px;
+  background:var(--s2);border-bottom:1px solid var(--outv);
+  overflow-x:auto;scrollbar-width:none;flex-shrink:0;min-height:50px}
+#plot-tabs::-webkit-scrollbar{display:none}
+.plt-chip{flex-shrink:0;padding:5px 12px;border-radius:20px;
+  border:1px solid var(--outv);background:var(--s3);color:var(--on-sv);cursor:pointer;
+  font-family:'Google Sans',sans-serif;font-size:11.5px;font-weight:500;
+  transition:all .2s var(--spring);display:flex;align-items:center;gap:6px}
+.plt-chip:hover{border-color:var(--pri);color:var(--pri)}
+.plt-chip.active{background:var(--pri-con);border-color:var(--pri-con);
+  color:var(--on-pri-con);box-shadow:0 2px 8px rgba(208,188,255,.25)}
+.plt-del{width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,.15);
+  display:flex;align-items:center;justify-content:center;font-size:9px;cursor:pointer;
+  transition:background .15s;flex-shrink:0}
+.plt-del:hover{background:rgba(242,184,181,.4);color:var(--err)}
+#plot-empty{flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:10px;color:var(--out);font-size:13px;padding:40px;
+  text-align:center}
+.pe-icon{font-size:52px;opacity:.22}
+/* scrollable view for zoomed plots */
+#plot-view{flex:1;overflow:auto;display:flex;padding:16px;background:var(--s1);
+  -webkit-overflow-scrolling:touch;align-items:flex-start;justify-content:center}
+#plot-wrap{display:none;background:white;border-radius:var(--r-lg);overflow:hidden;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);flex-shrink:0;max-width:100%;
+  animation:pltIn .35s var(--spring)}
+@keyframes pltIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+#plot-wrap img{display:block;width:100%;height:auto;max-width:none}
+
+/* ── FILES ── */
+#fdrop{margin:12px;border:2px dashed var(--outv);border-radius:var(--r-xl);
+  padding:26px 20px;text-align:center;color:var(--on-sv);
+  transition:all .25s var(--smooth);cursor:pointer;background:var(--s2);flex-shrink:0}
+#fdrop.drag{border-color:var(--pri);background:rgba(208,188,255,.07);transform:scale(1.01)}
+#fdrop:hover{border-color:var(--pri);background:rgba(208,188,255,.05)}
+.fd-icon{font-size:34px;opacity:.4;margin-bottom:8px}
+.fd-title{font-size:13px;font-weight:500;color:var(--on-s);margin-bottom:4px}
+.fd-sub{font-size:11px;color:var(--out)}
+#flist{flex:1;overflow-y:auto;padding:0 12px 12px;display:flex;flex-direction:column;gap:6px;
+  -webkit-overflow-scrolling:touch}
+.fcard{background:var(--s2);border:1px solid var(--outv);border-radius:var(--r-lg);
+  padding:10px 13px;display:flex;align-items:center;gap:9px;
+  animation:crdIn .3s var(--spring);transition:border-color .2s}
+@keyframes crdIn{from{transform:translateY(8px) scale(.97);opacity:0}to{transform:none;opacity:1}}
+.fcard:hover{border-color:var(--pri)}
+.f-ico{font-size:20px;flex-shrink:0}
+.f-info{flex:1;min-width:0}
+.f-name{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;
+  color:var(--pri);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.f-size{font-size:10.5px;color:var(--out);margin-top:2px}
+.f-cmd{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--on-sv);
+  background:var(--s3);border:1px solid var(--outv);border-radius:6px;
+  padding:2px 7px;cursor:pointer;transition:all .15s;white-space:nowrap;flex-shrink:0}
+.f-cmd:hover{border-color:var(--ter);color:var(--ter)}
+.f-del{width:28px;height:28px;border-radius:50%;border:none;cursor:pointer;
+  background:transparent;color:var(--out);font-size:14px;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .2s;flex-shrink:0}
+.f-del:hover{background:rgba(242,184,181,.15);color:var(--err)}
+#finput{display:none}
+
+/* ── PACKAGES ── */
+#psb{padding:10px 12px;background:var(--s2);border-bottom:1px solid var(--outv);
+  display:flex;gap:8px;align-items:center;flex-shrink:0}
+#pin{flex:1;background:var(--s3);border:1.5px solid var(--outv);border-radius:20px;
+  color:var(--on-s);font-family:'Google Sans',sans-serif;font-size:13px;
+  padding:8px 14px;outline:none;transition:border-color .2s}
+#pin:focus{border-color:var(--pri)}
+#plist{flex:1;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:6px;
+  -webkit-overflow-scrolling:touch}
+.pkg{background:var(--s2);border:1px solid var(--outv);border-radius:var(--r-lg);
+  padding:9px 13px;display:flex;align-items:center;gap:9px;transition:border-color .2s}
+.pkg:hover{border-color:var(--pri)}
+.pkg-n{font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:500;
+  color:#60A5FA;flex:1}
+.pkg-d{font-size:11px;color:var(--out);flex:2}
+.pkg-b{font-size:10.5px;padding:4px 10px;border-radius:12px;cursor:pointer;
+  font-family:'Google Sans',sans-serif;font-weight:500;white-space:nowrap;
+  transition:all .2s var(--spring);border:none}
+.pkg-b.av{background:rgba(96,165,250,.15);color:#60A5FA}
+.pkg-b.av:hover{background:rgba(96,165,250,.25);transform:scale(1.05)}
+.pkg-b.ok{background:rgba(134,239,172,.12);color:var(--ter);cursor:default}
+
+/* ── SETTINGS — Android-safe scroll fix ── */
+#P-settings{overflow:hidden}
+/* #sp must be flex:1 + min-height:0 for Android scroll to work */
+#sp{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:14px;display:flex;flex-direction:column;gap:10px;
+  min-height:0}
+.sg{background:var(--s2);border:1px solid var(--outv);border-radius:var(--r-xl);overflow:hidden;
+  flex-shrink:0}
+.sg-t{padding:9px 15px;font-size:11px;font-weight:700;color:var(--pri);
+  letter-spacing:1.2px;text-transform:uppercase;border-bottom:1px solid var(--outv);
+  background:var(--s3)}
+.s-row{padding:10px 15px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--outv);font-size:13px;transition:background .15s}
+.s-row:last-child{border-bottom:none}
+.s-row:hover{background:rgba(208,188,255,.04)}
+.s-sub{font-size:10.5px;color:var(--out);margin-top:2px}
+.pill-sel{background:var(--s3);border:1.5px solid var(--outv);color:var(--on-s);
+  font-family:'Google Sans',sans-serif;font-size:11.5px;padding:5px 10px;
+  border-radius:16px;outline:none;cursor:pointer;transition:border-color .2s}
+.pill-sel:focus{border-color:var(--pri)}
+.tog{width:40px;height:24px;border-radius:12px;cursor:pointer;position:relative;
+  transition:background .25s var(--smooth);flex-shrink:0;border:none;
+  background:var(--outv)}
+.tog.on{background:var(--pri-con)}
+.tog::after{content:'';position:absolute;width:18px;height:18px;border-radius:50%;
+  background:var(--s1);top:3px;left:3px;
+  transition:left .25s var(--spring),background .25s;
+  box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.tog.on::after{left:19px;background:var(--on-pri-con)}
+.cap{font-size:10.5px;padding:3px 9px;border-radius:12px;font-family:'JetBrains Mono',monospace}
+.cap.y{background:rgba(134,239,172,.12);color:var(--ter)}
+.cap.n{background:rgba(242,184,181,.1);color:var(--err)}
+
+/* ── Syntax highlight token colours (VSCode One Dark–ish) ── */
+.hl-kw {color:#C678DD}        /* keywords — purple */
+.hl-str{color:#98C379}        /* strings  — green  */
+.hl-cmt{color:#5C6370;font-style:italic} /* comments — grey  */
+.hl-num{color:#D19A66}        /* numbers  — orange */
+.hl-fn {color:#61AFEF}        /* functions— blue   */
+.hl-op {color:#56B6C2}        /* operators— cyan   */
+
+/* ── PWA install toast ── */
+</style>
+</head>
+<body>
+
+<div id="app-shell">
+<!-- LOADING -->
+<div id="lo">
+  <div class="lo-icon">R</div>
+  <div class="lo-title">R-IDE</div>
+  <div class="lo-sub" id="lo-msg">Initialising WebR engine…<br>First load ~10 MB, cached offline after.</div>
+  <div class="lo-track"><div class="lo-fill" id="lo-bar"></div></div>
+</div>
+
+<!-- HEADER -->
+<div id="hdr">
+  <div class="logo">
+    <div class="logo-chip">R</div>
+    <div class="logo-name">R-IDE</div>
+  </div>
+  <div class="sp"></div>
+  <div id="status" class="s-load"><div id="sdot"></div><span id="stxt">Loading…</span></div>
+</div>
+
+<!-- NAV -->
+<div id="nav">
+  <button class="nt on" onclick="goTab('editor')"   id="T-editor">  ✏️ Editor</button>
+  <button class="nt"    onclick="goTab('console')"  id="T-console"> 💻 Console</button>
+  <button class="nt"    onclick="goTab('plots')"    id="T-plots">   📊 Plots <span class="nbadge"></span></button>
+  <button class="nt"    onclick="goTab('files')"    id="T-files">   📂 Files</button>
+  <button class="nt"    onclick="goTab('packages')" id="T-packages">📦 Packages</button>
+  <button class="nt"    onclick="goTab('settings')" id="T-settings">⚙️ Settings</button>
+</div>
+
+<div id="main">
+
+  <!-- ══ EDITOR ══ -->
+  <div class="pane on" id="P-editor">
+    <div id="etb">
+      <button class="btn btn-run"    id="runbtn"  onclick="runCode()">▶ Run</button>
+      <button class="btn btn-tonal"  id="selbtn"  onclick="runSel()">▶ Sel</button>
+      <button class="btn btn-danger" id="clearbtn" onclick="edClear()">✕ Clear</button>
+      <button class="btn btn-tonal etb-icon" onclick="openScript()" title="Open .R file">📂</button>
+      <button class="btn btn-tonal etb-icon" onclick="saveScript()" title="Save .R file">💾</button>
+      <input type="file" id="script-input" accept=".r,.R,.rscript,.txt" style="display:none" onchange="onScriptOpen(event)">
+    </div>
+    <div id="ewrap">
+      <div id="lnum-col"><div id="lnums"></div></div>
+      <div id="ed-container">
+        <pre id="hl" aria-hidden="true"></pre>
+        <textarea id="ed" spellcheck="false" autocorrect="off" autocapitalize="none" autocomplete="off"># Welcome to R-IDE — powered by WebR
+# Ctrl+Enter or ▶ Run to execute
+
+x <- seq(1, 10)
+y <- x ^ 2
+
+cat("Mean:", mean(x), "\n")
+cat("SD:  ", round(sd(x), 2), "\n")
+
+plot(x, y,
+     type = "b", col = "steelblue",
+     lwd = 2, pch = 19,
+     main = "y = x\u00b2", xlab = "x", ylab = "y")
+grid(col = "grey80")
+</textarea>
+      </div><!-- #ed-container -->
+      <div id="ac"><div id="ac-list"></div><div id="ac-detail"><div id="ac-sig"></div><div id="ac-desc"></div></div></div>
+    </div>
+  </div>
+
+  <!-- ══ CONSOLE ══ -->
+  <div class="pane" id="P-console">
+    <div id="cout">
+      <div class="ol inf">R-IDE — WebR engine</div>
+      <div class="ol inf">Run scripts from Editor, or type below.</div>
+      <div class="ol sep"></div>
+    </div>
+    <div id="replbar">
+      <span class="rp">&gt;</span>
+      <input id="ri" placeholder="R expression…" autocorrect="off" autocapitalize="none"
+             spellcheck="false" autocomplete="off" onkeydown="onRepl(event)">
+    </div>
+  </div>
+
+  <!-- ══ PLOTS ══ -->
+  <div class="pane" id="P-plots">
+    <div id="ptb">
+      <button class="btn btn-tonal" onclick="clearPlots()">✕ Clear all</button>
+      <button class="btn btn-tonal" onclick="savePlot()">⬇ Save</button>
+      <span id="pcnt"></span>
+    </div>
+    <!-- zoom bar -->
+    <div id="zoom-bar">
+      <button class="zoom-btn" onclick="zoomPlot(.8)" title="Zoom out">−</button>
+      <span id="zoom-val">100%</span>
+      <button class="zoom-btn" onclick="zoomPlot(1.25)" title="Zoom in">+</button>
+    </div>
+    <div id="plot-tabs"></div>
+    <div id="plot-view">
+      <div id="plot-empty">
+        <div class="pe-icon">📊</div>
+        <div style="font-weight:500">No plots yet</div>
+        <div style="font-size:11px;color:var(--out);margin-top:4px">Run plot(), hist(), ggplot()… from the Editor</div>
+      </div>
+      <div id="plot-wrap"><img id="plot-img" src="" alt="plot"></div>
+    </div>
+  </div>
+
+  <!-- ══ FILES ══ -->
+  <div class="pane" id="P-files">
+    <div id="fdrop"
+         onclick="document.getElementById('finput').click()"
+         ondragover="event.preventDefault();this.classList.add('drag')"
+         ondragleave="this.classList.remove('drag')"
+         ondrop="onDrop(event)">
+      <div class="fd-icon">📂</div>
+      <div class="fd-title">Drop files here or tap to browse</div>
+      <div class="fd-sub">CSV · TSV · Excel (.xlsx) · JSON · RData · RDS</div>
+    </div>
+    <input type="file" id="finput" multiple
+           accept=".csv,.tsv,.xlsx,.xls,.json,.rdata,.rds,.txt"
+           onchange="onFileInput(event)">
+    <div id="flist"></div>
+  </div>
+
+  <!-- ══ PACKAGES ══ -->
+  <div class="pane" id="P-packages">
+    <div id="psb">
+      <input id="pin" placeholder="Search or type package name…"
+             autocorrect="off" autocapitalize="none" spellcheck="false"
+             oninput="renderPkgs(this.value)"
+             onkeydown="if(event.key==='Enter')installPkg()">
+      <button class="btn btn-run" onclick="installPkg()">Install</button>
+    </div>
+    <div id="plist"></div>
+  </div>
+
+  <!-- ══ SETTINGS — Android-compatible ══ -->
+  <div class="pane" id="P-settings">
+    <div id="sp">
+      <div class="sg">
+        <div class="sg-t">Editor</div>
+        <div class="s-row">
+          <div>Font Size</div>
+          <select class="pill-sel" onchange="const s=this.value+'px';document.getElementById('ed').style.fontSize=s;document.getElementById('hl').style.fontSize=s;updateLnums()">
+            <option value="11">11px</option><option value="12">12px</option>
+            <option value="13" selected>13px</option><option value="14">14px</option>
+            <option value="16">16px</option><option value="18">18px</option>
+          </select>
+        </div>
+        <div class="s-row">
+          <div>Word Wrap</div>
+          <button class="tog" id="wt"
+            onclick="this.classList.toggle('on');document.getElementById('ed').style.whiteSpace=this.classList.contains('on')?'pre-wrap':'pre'">
+          </button>
+        </div>
+        <div class="s-row">
+          <div><div>Autocomplete</div><div class="s-sub">Function &amp; variable suggestions</div></div>
+          <button class="tog on" id="act"
+            onclick="this.classList.toggle('on');acOn=this.classList.contains('on')">
+          </button>
+        </div>
+        <div class="s-row">
+          <div><div>Bracket Pairs</div><div class="s-sub">Auto-close () [] {} &quot;&quot; ''</div></div>
+          <button class="tog on" id="bpt"
+            onclick="this.classList.toggle('on');bpOn=this.classList.contains('on')">
+          </button>
+        </div>
+      </div>
+
+      <div class="sg">
+        <div class="sg-t">WebR Capabilities</div>
+        <div class="s-row"><div><div>Base R + stats + graphics</div><div class="s-sub">Fully supported in browser</div></div><span class="cap y">✓ Yes</span></div>
+        <div class="s-row"><div><div>CRAN Packages</div><div class="s-sub">Install via Packages tab (needs internet)</div></div><span class="cap y">✓ Yes</span></div>
+        <div class="s-row"><div><div>Plotting</div><div class="s-sub">captureR images → Plots tab</div></div><span class="cap y">✓ Yes</span></div>
+        <div class="s-row"><div><div>File I/O</div><div class="s-sub">Upload files → virtual /uploads/ filesystem</div></div><span class="cap y">✓ Yes</span></div>
+        <div class="s-row"><div><div>Offline mode</div><div class="s-sub">Cached by PWA after first load</div></div><span class="cap y">✓ Yes</span></div>
+        <div class="s-row"><div><div>system() shell calls</div><div class="s-sub">Not available in WebAssembly</div></div><span class="cap n">✗ No</span></div>
+      </div>
+
+      <div class="sg">
+        <div class="sg-t">Session</div>
+        <div class="s-row"><div>Clear Console</div><button class="btn btn-tonal" onclick="clearConsole()">Clear</button></div>
+        <div class="s-row"><div>Reset R Session</div><button class="btn btn-danger" onclick="resetSession()">Reset</button></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- #main -->
+
+</div><!-- #app-shell -->
+
+<script type="module">
+import { WebR } from 'https://webr.r-wasm.org/latest/webr.mjs';
+
+// ── Globals
+let webR, ready = false;
+let rHist = [], hIdx = -1;
+let installedPkgs = new Set();
+let acOn = true, bpOn = true;
+let acIdx = -1, acList = [];
+let acTimer = null;
+let plots = [], activePlot = -1;
+let plotZoom = 1;
+let uploadedFiles = [];
+
+const $ = id => document.getElementById(id);
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+// ── R Syntax Highlighter
+function highlightR(code) {
+  const KW = new Set(['if','else','for','while','repeat','function','return','next','break',
+    'TRUE','FALSE','NULL','NA','NA_integer_','NA_real_','NA_complex_','NA_character_',
+    'Inf','NaN','pi','LETTERS','letters','in','library','require','source','invisible']);
+  let out = '', i = 0, n = code.length;
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const span = (cls, s) => `<span class="hl-${cls}">${esc(s)}</span>`;
+  while (i < n) {
+    const ch = code[i];
+    // Comment
+    if (ch === '#') {
+      let j = i; while (j < n && code[j] !== '\n') j++;
+      out += span('cmt', code.slice(i,j)); i = j; continue;
+    }
+    // String double
+    if (ch === '"') {
+      let j = i+1;
+      while (j < n && code[j] !== '"') { if (code[j]==='\\') j++; j++; }
+      j++;
+      out += span('str', code.slice(i,j)); i = j; continue;
+    }
+    // String single
+    if (ch === "'") {
+      let j = i+1;
+      while (j < n && code[j] !== "'") { if (code[j]==='\\') j++; j++; }
+      j++;
+      out += span('str', code.slice(i,j)); i = j; continue;
+    }
+    // Number
+    if (/[0-9]/.test(ch) || (ch==='.' && /[0-9]/.test(code[i+1]||''))) {
+      let j = i;
+      while (j < n && /[0-9eE.xXaAbBcCdDeEfFLi+\-]/.test(code[j])) j++;
+      out += span('num', code.slice(i,j)); i = j; continue;
+    }
+    // Word
+    if (/[A-Za-z_.]/.test(ch)) {
+      let j = i;
+      while (j < n && /[A-Za-z0-9_.]/.test(code[j])) j++;
+      const word = code.slice(i,j);
+      let k = j; while (k < n && (code[k]===' '||code[k]==='\t')) k++;
+      if (KW.has(word))       out += span('kw', word);
+      else if (code[k]==='(') out += span('fn', word);
+      else                    out += esc(word);
+      i = j; continue;
+    }
+    // Operator
+    if (/[<>!|&=+\-*\/^~%]/.test(ch)) {
+      const two = code.slice(i,i+2);
+      if (['<-','->','<<-','->>','|>',':=','==','!=','<=','>=','&&','||','**','%>%'].includes(two)) {
+        out += span('op', two); i += 2;
+      } else {
+        out += span('op', ch); i++;
+      }
+      continue;
+    }
+    // Default
+    out += esc(ch); i++;
+  }
+  return out;
+}
+
+function updateHighlight() {
+  const hl = $('hl');
+  if (!hl) return;
+  hl.innerHTML = highlightR($('ed').value) + '\n';
+}
+
+// ── PWA — manifest (dynamic blob), service worker, install prompt
+function setupPWA() {
+  // Register external sw.js — PWABuilder and TWA require a real fetchable service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+      .then(reg => console.log('[R-IDE] SW registered:', reg.scope))
+      .catch(err => console.warn('[R-IDE] SW registration failed:', err));
+  }
+}
+
+setupPWA();
+
+// ── Load progress
+function setLoad(p, m) { $('lo-bar').style.width = p + '%'; $('lo-msg').textContent = m; }
+function setSt(c, t)   { $('status').className = c; $('stxt').textContent = t; }
+
+// ── Boot
+async function boot() {
+  setLoad(8, 'Creating WebR instance…');
+  webR = new WebR();
+  setLoad(18, 'Downloading WebR (~10 MB first time, cached after)…');
+  await webR.init();
+  setLoad(88, 'Setting up environment…');
+  try { await webR.FS.mkdir('/uploads'); } catch(_) {}
+  await webR.evalRVoid('invisible(NULL)');
+  setLoad(100, 'Ready!');
+  await wait(300);
+  ready = true;
+  $('lo').classList.add('gone');
+  setSt('s-ok', 'Ready');
+  log('✓ R is running via WebR!', 'ok');
+  log('ℹ Ctrl+Enter or ▶ Run to execute.  Plots → Plots tab.', 'inf');
+  renderPkgs('');
+  updateLnums();
+}
+
+// ══════════════════════════════════════════════
+// CORE RUN — captureR is the ONLY correct WebR plot API
+// capture.images → ImageBitmap[] (the official approach)
+// ══════════════════════════════════════════════
+async function runCode(code) {
+  if (!ready) { log('⚠ Engine not ready.', 'wrn'); return; }
+  if (code == null) code = $('ed').value;
+  if (!code.trim()) return;
+
+  setBtns(false);
+  setSt('s-run', 'Running…');
+  log('', 'sep');
+  log('▶ ' + code.replace(/\s+/g, ' ').trim().slice(0, 72), 'cmd');
+
+  let hasErr = false;
+  const shelter = await new webR.Shelter();
+  try {
+    const cap = await shelter.captureR(code, {
+      withAutoprint: true,
+      captureStreams: true,
+      captureConditions: true,
+    });
+
+    for (const msg of cap.output) {
+      if (msg.type === 'stdout') {
+        msg.data.split('\n').forEach(l => l && log(l, 'res'));
+      } else if (msg.type === 'stderr' || msg.type === 'message') {
+        const t = typeof msg.data === 'string' ? msg.data : (msg.data?.message ?? '');
+        if (t.trim()) log(t.trim(), 'wrn');
+      } else if (msg.type === 'error') {
+        const t = typeof msg.data === 'string' ? msg.data : (msg.data?.message ?? '');
+        if (t.trim()) { log('Error: ' + t.trim(), 'err'); hasErr = true; }
+      }
+    }
+
+    // THE CORRECT API: capture.images is ImageBitmap[]
+    if (cap.images && cap.images.length > 0) {
+      for (const bmp of cap.images) addPlot(bmp);
+    }
+
+  } catch(e) {
+    hasErr = true;
+    log('✗ ' + (e.message || String(e)), 'err');
+  } finally {
+    await shelter.purge();
+  }
+
+  setBtns(true);
+  setSt(hasErr ? 's-err' : 's-ok', hasErr ? 'Error' : 'Ready');
+  if (hasErr) setTimeout(() => setSt('s-ok', 'Ready'), 2500);
+  if ($('T-editor').classList.contains('on')) goTab('console');
+}
+window.runCode = runCode;
+
+window.runSel = function() {
+  const ta = $('ed');
+  const s = ta.value.substring(ta.selectionStart, ta.selectionEnd).trim();
+  s ? runCode(s) : log('⚠ Select code first.', 'wrn');
+};
+window.edClear = () => {
+  $('ed').value = '';
+  updateHighlight();
+  updateLnums();
+};
+function setBtns(en) {
+  $('runbtn').disabled  = !en;
+  $('selbtn').disabled  = !en;
+  $('clearbtn').disabled = !en;
+}
+
+// ── Console
+function log(t, c = 'res') {
+  const out = $('cout');
+  if (c === 'sep') {
+    const d = document.createElement('div'); d.className = 'ol sep'; out.appendChild(d);
+  } else {
+    const d = document.createElement('div'); d.className = 'ol ' + c;
+    d.textContent = t; out.appendChild(d);
+  }
+  out.scrollTop = out.scrollHeight;
+}
+window.clearConsole = () => { $('cout').innerHTML = ''; log('Console cleared.', 'inf'); };
+
+// ── REPL
+window.onRepl = async function(e) {
+  if (e.key === 'ArrowUp')   { hIdx = Math.min(hIdx+1, rHist.length-1); if(rHist[hIdx]) e.target.value = rHist[hIdx]; return; }
+  if (e.key === 'ArrowDown') { hIdx = Math.max(hIdx-1, -1); e.target.value = hIdx >= 0 ? rHist[hIdx] : ''; return; }
+  if (e.key === 'Enter') {
+    const c = e.target.value.trim(); if (!c) return;
+    rHist.unshift(c); hIdx = -1; e.target.value = '';
+    log('> ' + c, 'cmd'); await runCode(c);
+  }
+};
+
+// ══════════════════════════════════════════════
+// LINE NUMBERS — synced with textarea
+// ══════════════════════════════════════════════
+const lnums  = $('lnums');
+const lnCol  = $('lnum-col');
+
+window.updateLnums = function() {
+  const lines = $('ed').value.split('\n');
+  const count = lines.length;
+  if (lnums._lastCount === count) return;
+  lnums._lastCount = count;
+  lnums.textContent = Array.from({length: count}, (_, i) => i + 1).join('\n');
+};
+
+$('ed').addEventListener('scroll', () => {
+  lnums.style.transform = `translateY(${-$('ed').scrollTop}px)`;
+});
+
+// ══════════════════════════════════════════════
+// PLOTS — tab carousel + zoom
+// ══════════════════════════════════════════════
+function bitmapToDataURL(bmp) {
+  const c = document.createElement('canvas');
+  c.width = bmp.width; c.height = bmp.height;
+  c.getContext('2d').drawImage(bmp, 0, 0);
+  const url = c.toDataURL('image/png');
+  bmp.close?.();
+  return url;
+}
+
+function addPlot(bmp) {
+  const src = bitmapToDataURL(bmp);
+  const id  = plots.length + 1;
+  plots.push({ id, src, title: 'Plot ' + id });
+  renderPlotTabs();
+  showPlot(plots.length - 1);
+  $('T-plots').classList.add('has-badge');
+}
+
+function renderPlotTabs() {
+  const tabs = $('plot-tabs');
+  tabs.innerHTML = '';
+  if (!plots.length) return;
+  plots.forEach((p, i) => {
+    const chip = document.createElement('div');
+    chip.className = 'plt-chip' + (i === activePlot ? ' active' : '');
+    chip.innerHTML = `<span>${p.title}</span><span class="plt-del" data-i="${i}">✕</span>`;
+    chip.addEventListener('click', ev => {
+      if (ev.target.classList.contains('plt-del')) {
+        deletePlot(parseInt(ev.target.dataset.i));
+      } else {
+        showPlot(i);
+      }
+    });
+    tabs.appendChild(chip);
+  });
+  $('pcnt').textContent = plots.length + ' plot' + (plots.length !== 1 ? 's' : '');
+}
+
+function showPlot(idx) {
+  if (idx < 0 || idx >= plots.length) return;
+  activePlot = idx;
+  // Reset zoom to 100% natural size when switching plots
+  plotZoom = 1;
+  $('zoom-val').textContent = '100%';
+
+  $('plot-empty').style.display = 'none';
+  const wrap = $('plot-wrap');
+  wrap.style.display = 'block';
+  wrap.style.animation = 'none';
+  void wrap.offsetWidth;
+  wrap.style.animation = '';
+  const pi = $('plot-img');
+  // Reset everything — CSS handles fit-to-width at zoom=1
+  pi.style.width = '100%';
+  pi.style.height = 'auto';
+  pi.style.maxWidth = 'none';
+  wrap.style.width = '';
+  wrap.style.height = '';
+  $('plot-view').style.justifyContent = 'center';
+  pi.src = plots[idx].src;
+  renderPlotTabs();
+}
+
+window.deletePlot = function(idx) {
+  plots.splice(idx, 1);
+  if (!plots.length) {
+    activePlot = -1;
+    $('plot-empty').style.display = '';
+    $('plot-wrap').style.display = 'none';
+    $('pcnt').textContent = '';
+    $('T-plots').classList.remove('has-badge');
+  } else {
+    showPlot(Math.min(idx, plots.length - 1));
+  }
+  renderPlotTabs();
+};
+
+window.clearPlots = function() {
+  plots = []; activePlot = -1; plotZoom = 1;
+  $('plot-tabs').innerHTML = '';
+  $('plot-empty').style.display = '';
+  $('plot-wrap').style.display = 'none';
+  $('plot-wrap').style.transform = 'scale(1)';
+  $('zoom-val').textContent = '100%';
+  $('pcnt').textContent = '';
+  $('T-plots').classList.remove('has-badge');
+};
+
+window.savePlot = function() {
+  if (activePlot < 0 || !plots[activePlot]) { log('No plot to save.', 'wrn'); return; }
+  const a = document.createElement('a');
+  a.href = plots[activePlot].src;
+  a.download = 'rplot-' + Date.now() + '.png';
+  a.click();
+};
+
+// ── Zoom: at 100% fit to container width; above that expand to natural size × factor
+window.zoomPlot = function(factor) {
+  plotZoom = Math.max(0.5, Math.min(5, plotZoom * factor));
+  $('zoom-val').textContent = Math.round(plotZoom * 100) + '%';
+
+  const wrap = $('plot-wrap');
+  const view = $('plot-view');
+  const img  = $('plot-img');
+  const viewW = view.clientWidth - 32; // subtract padding
+
+  function apply() {
+    const nat = img.naturalWidth || viewW;
+    const scaled = Math.round(nat * plotZoom);
+    if (scaled <= viewW) {
+      // Fits inside — centre it, no overflow
+      img.style.width    = '100%';
+      img.style.maxWidth = scaled + 'px';
+      wrap.style.width   = '';
+      view.style.justifyContent = 'center';
+    } else {
+      // Larger than view — allow scroll
+      img.style.width    = scaled + 'px';
+      img.style.maxWidth = 'none';
+      wrap.style.width   = scaled + 'px';
+      view.style.justifyContent = 'flex-start';
+    }
+    img.style.height = 'auto';
+    wrap.style.height = '';
+  }
+  if (img.complete && img.naturalWidth) { apply(); } else { img.onload = apply; }
+};
+
+// ══════════════════════════════════════════════
+// FILE MANAGER
+// ══════════════════════════════════════════════
+async function loadSheetJS() {
+  if (window.XLSX) return;
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+    s.onload = res; s.onerror = () => rej(new Error('SheetJS load failed'));
+    document.head.appendChild(s);
+  });
+}
+
+window.onDrop = function(e) {
+  e.preventDefault();
+  $('fdrop').classList.remove('drag');
+  Array.from(e.dataTransfer.files).forEach(processFile);
+};
+window.onFileInput = function(e) {
+  Array.from(e.target.files).forEach(processFile);
+  e.target.value = '';
+};
+
+async function processFile(file) {
+  const name  = file.name;
+  const ext   = name.split('.').pop().toLowerCase();
+  const size  = fmtBytes(file.size);
+  const safe  = name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  let rPath, readCmd, icon;
+
+  try {
+    if (ext === 'xlsx' || ext === 'xls') {
+      icon = '📊';
+      await loadSheetJS();
+      const buf = await file.arrayBuffer();
+      const wb  = XLSX.read(buf, { type: 'array' });
+      const ws  = wb.Sheets[wb.SheetNames[0]];
+      const csv = XLSX.utils.sheet_to_csv(ws);
+      const csvName = safe.replace(/\.xlsx?$/, '.csv');
+      rPath = '/uploads/' + csvName;
+      await webR.FS.writeFile(rPath, new TextEncoder().encode(csv));
+      readCmd = `df <- read.csv("${rPath}")`;
+    } else if (ext === 'csv' || ext === 'tsv' || ext === 'txt') {
+      icon = '📄';
+      rPath = '/uploads/' + safe;
+      await webR.FS.writeFile(rPath, new Uint8Array(await file.arrayBuffer()));
+      readCmd = ext === 'tsv' ? `df <- read.delim("${rPath}")` : `df <- read.csv("${rPath}")`;
+    } else if (ext === 'json') {
+      icon = '🔵';
+      rPath = '/uploads/' + safe;
+      await webR.FS.writeFile(rPath, new Uint8Array(await file.arrayBuffer()));
+      readCmd = `df <- jsonlite::fromJSON("${rPath}")`;
+    } else if (ext === 'rdata' || ext === 'rda') {
+      icon = '🔴';
+      rPath = '/uploads/' + safe;
+      await webR.FS.writeFile(rPath, new Uint8Array(await file.arrayBuffer()));
+      readCmd = `load("${rPath}")`;
+    } else if (ext === 'rds') {
+      icon = '🔴';
+      rPath = '/uploads/' + safe;
+      await webR.FS.writeFile(rPath, new Uint8Array(await file.arrayBuffer()));
+      readCmd = `df <- readRDS("${rPath}")`;
+    } else {
+      icon = '📄';
+      rPath = '/uploads/' + safe;
+      await webR.FS.writeFile(rPath, new Uint8Array(await file.arrayBuffer()));
+      readCmd = `# File at: ${rPath}`;
+    }
+
+    const idx = uploadedFiles.findIndex(f => f.rPath === rPath);
+    const rec = { name, size, rPath, readCmd, icon };
+    if (idx >= 0) uploadedFiles[idx] = rec; else uploadedFiles.push(rec);
+    renderFileList();
+    log(`✓ "${name}" → ${rPath}`, 'ok');
+    log(`  Run: ${readCmd}`, 'inf');
+  } catch(e) {
+    log('✗ Failed: "' + name + '" — ' + e.message, 'err');
+  }
+}
+
+function fmtBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+
+function renderFileList() {
+  const el = $('flist'); el.innerHTML = '';
+  uploadedFiles.forEach((f, i) => {
+    const d = document.createElement('div'); d.className = 'fcard';
+    d.innerHTML = `<span class="f-ico">${f.icon}</span>
+      <div class="f-info">
+        <div class="f-name">${f.name}</div>
+        <div class="f-size">${f.size} · ${f.rPath}</div>
+      </div>
+      <span class="f-cmd" onclick="copyCmd(${i})">📋 Copy cmd</span>
+      <button class="f-del" onclick="removeFile(${i})">✕</button>`;
+    el.appendChild(d);
+  });
+}
+
+window.copyCmd = function(i) {
+  const cmd = uploadedFiles[i].readCmd;
+  navigator.clipboard?.writeText(cmd)
+    .then(() => log('📋 Copied: ' + cmd, 'inf'))
+    .catch(() => log(cmd, 'inf'));
+};
+window.removeFile = async function(i) {
+  try { await webR.evalRVoid(`unlink("${uploadedFiles[i].rPath}")`); } catch(_) {}
+  log('Removed: ' + uploadedFiles[i].name, 'inf');
+  uploadedFiles.splice(i, 1);
+  renderFileList();
+};
+
+// ══════════════════════════════════════════════
+// PACKAGES
+// ══════════════════════════════════════════════
+const PKGS = [
+  {n:'ggplot2',d:'Elegant data visualisations'},{n:'dplyr',d:'Data manipulation'},
+  {n:'tidyr',d:'Tidy & reshape data'},{n:'stringr',d:'String operations'},
+  {n:'readr',d:'Read CSV/TSV files'},{n:'purrr',d:'Functional programming'},
+  {n:'tibble',d:'Modern data frames'},{n:'lubridate',d:'Date & time'},
+  {n:'forcats',d:'Factor manipulation'},{n:'jsonlite',d:'JSON parser'},
+  {n:'glue',d:'String interpolation'},{n:'scales',d:'Scale helpers'},
+  {n:'broom',d:'Tidy model outputs'},{n:'plotly',d:'Interactive plots'},
+  {n:'data.table',d:'Fast data manipulation'},{n:'Rcpp',d:'R + C++ integration'},
+  {n:'reshape2',d:'Reshape data frames'},{n:'zoo',d:'Time series'},
+];
+window.renderPkgs = function(f = '') {
+  const el = $('plist'); el.innerHTML = '';
+  const show = f ? PKGS.filter(p => p.n.toLowerCase().includes(f.toLowerCase())) : PKGS;
+  if (!show.length) { el.innerHTML = '<div style="padding:14px;font-size:12px;color:var(--out)">Type a name & press Install.</div>'; return; }
+  show.forEach(p => {
+    const ok = installedPkgs.has(p.n);
+    const d  = document.createElement('div'); d.className = 'pkg';
+    d.innerHTML = `<div class="pkg-n">${p.n}</div><div class="pkg-d">${p.d}</div>
+      <button class="pkg-b ${ok?'ok':'av'}" onclick="${ok?'':'installPkg(\''+p.n+'\')'}">${ok?'✓ Installed':'+ Install'}</button>`;
+    el.appendChild(d);
+  });
+};
+window.installPkg = async function(name) {
+  if (!ready) { log('⚠ Not ready.','wrn'); return; }
+  name = name || $('pin').value.trim(); if (!name) return;
+  log('📦 Installing '+name+'…','inf'); setSt('s-run','Installing…'); goTab('console');
+  try {
+    await webR.evalRVoid(`webr::install("${name}")`);
+    installedPkgs.add(name);
+    log('✓ '+name+' installed!','ok');
+    setSt('s-ok','Ready'); renderPkgs($('pin').value);
+  } catch(e) {
+    log('✗ '+e.message,'err'); setSt('s-err','Error');
+    setTimeout(()=>setSt('s-ok','Ready'),2000);
+  }
+};
+
+// ══════════════════════════════════════════════
+// AUTOCOMPLETE
+// Static DB (instant) + R-native completions (async, after 280ms)
+// ══════════════════════════════════════════════
+const RFNS = [
+  ['plot','plot','plot(x, y, type, col, lwd, pch, main, xlab, ylab)','Generic X-Y plot'],
+  ['hist','plot','hist(x, breaks, col, border, main, xlab, freq)','Histogram'],
+  ['barplot','plot','barplot(height, names.arg, col, border, main, horiz)','Bar chart'],
+  ['boxplot','plot','boxplot(x, notch, col, horizontal, main)','Box-and-whisker plot'],
+  ['pie','plot','pie(x, labels, col, main)','Pie chart'],
+  ['heatmap','plot','heatmap(x, Rowv, Colv, col, scale, main)','Heatmap of a matrix'],
+  ['pairs','plot','pairs(x, col, pch, main)','Scatter-plot matrix'],
+  ['curve','plot','curve(expr, from, to, col, lwd, add)','Draw a function curve'],
+  ['image','plot','image(x, y, z, col, main)','Raster image plot'],
+  ['persp','plot','persp(x, y, z, theta, phi, col, main)','3-D perspective plot'],
+  ['qqnorm','plot','qqnorm(y, pch, col, main)','Normal Q-Q plot'],
+  ['contour','plot','contour(x, y, z, nlevels, col)','Contour lines'],
+  ['abs','fn','abs(x)','Absolute value'],['apply','fn','apply(X, MARGIN, FUN)','Apply over margins'],
+  ['as.character','fn','as.character(x)','Coerce to character'],
+  ['as.data.frame','fn','as.data.frame(x)','Coerce to data frame'],
+  ['as.factor','fn','as.factor(x)','Coerce to factor'],
+  ['as.integer','fn','as.integer(x)','Coerce to integer'],
+  ['as.numeric','fn','as.numeric(x)','Coerce to numeric'],
+  ['c','fn','c(...)','Combine into a vector'],
+  ['cat','fn','cat(..., sep, file)','Concatenate and print'],
+  ['cbind','fn','cbind(...)','Bind by columns'],
+  ['ceiling','fn','ceiling(x)','Round up'],
+  ['class','fn','class(x)','Get or set class'],
+  ['colMeans','fn','colMeans(x, na.rm)','Column means'],
+  ['colSums','fn','colSums(x, na.rm)','Column sums'],
+  ['cor','fn','cor(x, y, method)','Correlation coefficient'],
+  ['cos','fn','cos(x)','Cosine (radians)'],
+  ['cumsum','fn','cumsum(x)','Cumulative sum'],
+  ['cut','fn','cut(x, breaks, labels, include.lowest)','Divide into intervals'],
+  ['data.frame','fn','data.frame(..., stringsAsFactors)','Create data frame'],
+  ['density','fn','density(x, bw, kernel)','Kernel density estimate'],
+  ['diff','fn','diff(x, lag, differences)','Lagged differences'],
+  ['dim','fn','dim(x)','Dimensions of an object'],
+  ['do.call','fn','do.call(what, args)','Call function with arg list'],
+  ['duplicated','fn','duplicated(x, fromLast)','Find duplicate elements'],
+  ['exp','fn','exp(x)','Exponential e^x'],
+  ['factor','fn','factor(x, levels, labels, ordered)','Create a factor'],
+  ['floor','fn','floor(x)','Round down'],
+  ['format','fn','format(x, digits, nsmall, width)','Format for printing'],
+  ['function','ctrl','function(args) { body }','Define a function'],
+  ['for','ctrl','for (var in seq) { body }','For loop'],
+  ['if','ctrl','if (cond) expr else expr','Conditional'],
+  ['while','ctrl','while (cond) { body }','While loop'],
+  ['repeat','ctrl','repeat { body; if(cond) break }','Infinite loop'],
+  ['switch','fn','switch(EXPR, ...)','Multi-way conditional'],
+  ['grep','fn','grep(pattern, x, value, ignore.case)','Match → indices'],
+  ['grepl','fn','grepl(pattern, x, ignore.case)','Match → logical'],
+  ['gsub','fn','gsub(pattern, replacement, x)','Replace all matches'],
+  ['head','fn','head(x, n)','First n rows/elements'],
+  ['identical','fn','identical(x, y)','Test exact equality'],
+  ['ifelse','fn','ifelse(test, yes, no)','Vectorised conditional'],
+  ['is.na','fn','is.na(x)','Test for NA'],
+  ['is.null','fn','is.null(x)','Test for NULL'],
+  ['is.numeric','fn','is.numeric(x)','Test if numeric'],
+  ['lapply','fn','lapply(X, FUN, ...)','Apply → list'],
+  ['length','fn','length(x)','Number of elements'],
+  ['levels','fn','levels(x)','Factor levels'],
+  ['library','fn','library(package, quietly)','Load a package'],
+  ['list','fn','list(...)','Create a list'],
+  ['lm','fn','lm(formula, data, subset, weights)','Linear model'],
+  ['log','fn','log(x, base)','Logarithm (default: natural)'],
+  ['log10','fn','log10(x)','Base-10 logarithm'],
+  ['log2','fn','log2(x)','Base-2 logarithm'],
+  ['match','fn','match(x, table, nomatch)','First position of x in table'],
+  ['max','fn','max(..., na.rm)','Maximum value'],
+  ['mean','fn','mean(x, trim, na.rm)','Arithmetic mean'],
+  ['median','fn','median(x, na.rm)','Median'],
+  ['merge','fn','merge(x, y, by, all)','Merge data frames'],
+  ['min','fn','min(..., na.rm)','Minimum value'],
+  ['names','fn','names(x)','Get or set names'],
+  ['na.omit','fn','na.omit(object)','Remove NA rows'],
+  ['ncol','fn','ncol(x)','Number of columns'],
+  ['nrow','fn','nrow(x)','Number of rows'],
+  ['nchar','fn','nchar(x, type)','Number of characters'],
+  ['order','fn','order(..., decreasing)','Sorting indices'],
+  ['paste','fn','paste(..., sep, collapse)','Concatenate strings'],
+  ['paste0','fn','paste0(..., collapse)','Concatenate (no sep)'],
+  ['print','fn','print(x, digits)','Print an R object'],
+  ['prod','fn','prod(..., na.rm)','Product of values'],
+  ['quantile','fn','quantile(x, probs, na.rm)','Sample quantiles'],
+  ['range','fn','range(..., na.rm)','Min and max'],
+  ['rbind','fn','rbind(...)','Bind by rows'],
+  ['read.csv','fn','read.csv(file, header, sep, stringsAsFactors)','Read CSV'],
+  ['read.table','fn','read.table(file, header, sep, dec)','Read delimited file'],
+  ['Reduce','fn','Reduce(f, x, accumulate)','Reduce vector with binary function'],
+  ['rep','fn','rep(x, times, each, length.out)','Replicate elements'],
+  ['require','fn','require(package, quietly)','Load package'],
+  ['return','ctrl','return(value)','Return from function'],
+  ['rev','fn','rev(x)','Reverse elements'],
+  ['rm','fn','rm(..., list, envir)','Remove objects'],
+  ['round','fn','round(x, digits)','Round to decimal places'],
+  ['rowMeans','fn','rowMeans(x, na.rm)','Row means'],
+  ['rowSums','fn','rowSums(x, na.rm)','Row sums'],
+  ['sample','fn','sample(x, size, replace, prob)','Random sample'],
+  ['sapply','fn','sapply(X, FUN, simplify)','Apply → simplified'],
+  ['sd','fn','sd(x, na.rm)','Standard deviation'],
+  ['seq','fn','seq(from, to, by, length.out)','Generate sequence'],
+  ['seq_along','fn','seq_along(x)','Sequence along object'],
+  ['seq_len','fn','seq_len(n)','Sequence 1 to n'],
+  ['set.seed','fn','set.seed(seed)','Set random seed'],
+  ['sin','fn','sin(x)','Sine (radians)'],
+  ['sort','fn','sort(x, decreasing, na.last)','Sort a vector'],
+  ['sprintf','fn','sprintf(fmt, ...)','Formatted string'],
+  ['sqrt','fn','sqrt(x)','Square root'],
+  ['startsWith','fn','startsWith(x, prefix)','String starts-with check'],
+  ['strsplit','fn','strsplit(x, split, fixed)','Split strings'],
+  ['str','fn','str(object, max.level)','Display structure'],
+  ['sub','fn','sub(pattern, replacement, x)','Replace first match'],
+  ['subset','fn','subset(x, subset, select)','Subset data frame'],
+  ['sum','fn','sum(..., na.rm)','Sum of values'],
+  ['summary','fn','summary(object)','Summary statistics'],
+  ['t','fn','t(x)','Transpose matrix'],
+  ['table','fn','table(..., useNA)','Frequency table'],
+  ['tail','fn','tail(x, n)','Last n elements'],
+  ['tapply','fn','tapply(X, INDEX, FUN)','Apply by group'],
+  ['tolower','fn','tolower(x)','To lower case'],
+  ['toupper','fn','toupper(x)','To upper case'],
+  ['trimws','fn','trimws(x, which)','Remove whitespace'],
+  ['tryCatch','fn','tryCatch(expr, error, warning, finally)','Condition handling'],
+  ['typeof','fn','typeof(x)','Internal storage type'],
+  ['unique','fn','unique(x, fromLast)','Remove duplicates'],
+  ['unlist','fn','unlist(x, recursive, use.names)','Flatten list'],
+  ['var','fn','var(x, na.rm)','Variance'],
+  ['which','fn','which(x, arr.ind)','Indices of TRUE'],
+  ['which.max','fn','which.max(x)','Index of max'],
+  ['which.min','fn','which.min(x)','Index of min'],
+  ['with','fn','with(data, expr)','Evaluate in data context'],
+  ['write.csv','fn','write.csv(x, file, row.names)','Write CSV'],
+  // graphics
+  ['abline','fn','abline(a, b, h, v, reg, col, lwd, lty)','Add reference line'],
+  ['axis','fn','axis(side, at, labels, col, las)','Add axis'],
+  ['box','fn','box(which, lty, col)','Add border box'],
+  ['grid','fn','grid(nx, ny, col, lty, lwd)','Add grid lines'],
+  ['legend','fn','legend(x, y, legend, col, lty, pch)','Add legend'],
+  ['lines','fn','lines(x, y, type, col, lwd, lty)','Add lines'],
+  ['mtext','fn','mtext(text, side, line, adj, col)','Margin text'],
+  ['par','fn','par(mfrow, mfcol, mar, oma, bg, cex)','Graphics parameters'],
+  ['points','fn','points(x, y, pch, col, cex)','Add points'],
+  ['polygon','fn','polygon(x, y, col, border)','Draw polygon'],
+  ['rect','fn','rect(xleft, ybottom, xright, ytop, col, border)','Draw rectangles'],
+  ['segments','fn','segments(x0, y0, x1, y1, col, lwd)','Draw segments'],
+  ['text','fn','text(x, y, labels, col, cex, adj)','Add text'],
+  ['title','fn','title(main, sub, xlab, ylab)','Set title/labels'],
+  ['colorRampPalette','fn','colorRampPalette(colors)(n)','Create colour ramp'],
+  ['rgb','fn','rgb(red, green, blue, alpha, maxColorValue)','Specify colour by RGB'],
+  ['rainbow','fn','rainbow(n, s, v, start, end)','Rainbow colour palette'],
+  // stats
+  ['anova','fn','anova(object)','ANOVA table'],
+  ['aov','fn','aov(formula, data)','Analysis of variance'],
+  ['chisq.test','fn','chisq.test(x, y, correct)','Chi-squared test'],
+  ['cor.test','fn','cor.test(x, y, method, alternative)','Correlation test'],
+  ['glm','fn','glm(formula, family, data)','Generalised linear model'],
+  ['kmeans','fn','kmeans(x, centers, iter.max, nstart)','K-means clustering'],
+  ['pnorm','fn','pnorm(q, mean, sd, lower.tail)','Normal CDF'],
+  ['qnorm','fn','qnorm(p, mean, sd, lower.tail)','Normal quantile'],
+  ['dnorm','fn','dnorm(x, mean, sd)','Normal density'],
+  ['rnorm','fn','rnorm(n, mean, sd)','Normal random deviates'],
+  ['runif','fn','runif(n, min, max)','Uniform random deviates'],
+  ['rbinom','fn','rbinom(n, size, prob)','Binomial random deviates'],
+  ['rpois','fn','rpois(n, lambda)','Poisson random deviates'],
+  ['rt','fn','rt(n, df)','t random deviates'],
+  ['t.test','fn','t.test(x, y, alternative, mu, paired, var.equal)','Student t-test'],
+  ['shapiro.test','fn','shapiro.test(x)','Shapiro-Wilk normality test'],
+  ['wilcox.test','fn','wilcox.test(x, y, alternative)','Wilcoxon test'],
+  ['prop.test','fn','prop.test(x, n, p, alternative, correct)','Test of proportions'],
+  ['predict','fn','predict(object, newdata)','Model predictions'],
+  ['residuals','fn','residuals(object)','Model residuals'],
+  ['fitted','fn','fitted(object)','Fitted values'],
+  ['coef','fn','coef(object)','Model coefficients'],
+  ['confint','fn','confint(object, parm, level)','Confidence intervals'],
+  ['AIC','fn','AIC(object, k)','Akaike Information Criterion'],
+  ['step','fn','step(object, scope, direction)','Stepwise AIC selection'],
+  // ggplot2
+  ['ggplot','pkg','ggplot(data, aes(...))','Create ggplot object'],
+  ['aes','pkg','aes(x, y, color, fill, size, shape, alpha)','Aesthetic mappings'],
+  ['geom_point','pkg','geom_point(color, size, shape, alpha)','Scatter geometry'],
+  ['geom_line','pkg','geom_line(color, linewidth, linetype)','Line geometry'],
+  ['geom_bar','pkg','geom_bar(stat, fill, color, width)','Bar geometry'],
+  ['geom_col','pkg','geom_col(fill, color, width)','Column chart'],
+  ['geom_histogram','pkg','geom_histogram(binwidth, bins, fill, color)','Histogram'],
+  ['geom_boxplot','pkg','geom_boxplot(fill, color, notch, outlier.color)','Boxplot'],
+  ['geom_violin','pkg','geom_violin(fill, color, trim, scale)','Violin plot'],
+  ['geom_density','pkg','geom_density(fill, alpha, color, bw)','Density curve'],
+  ['geom_smooth','pkg','geom_smooth(method, se, color, fill, level)','Smoother'],
+  ['geom_ribbon','pkg','geom_ribbon(aes(ymin, ymax), fill, alpha)','Ribbon/band'],
+  ['geom_area','pkg','geom_area(fill, alpha, color)','Area geometry'],
+  ['geom_tile','pkg','geom_tile(aes(fill=...), color)','Tile/heatmap'],
+  ['geom_text','pkg','geom_text(aes(label=...), size, color, hjust)','Text labels'],
+  ['geom_label','pkg','geom_label(aes(label=...), fill, color)','Labelled text'],
+  ['geom_vline','pkg','geom_vline(xintercept, color, linetype)','Vertical line'],
+  ['geom_hline','pkg','geom_hline(yintercept, color, linetype)','Horizontal line'],
+  ['geom_abline','pkg','geom_abline(slope, intercept, color)','Diagonal line'],
+  ['geom_jitter','pkg','geom_jitter(width, height, color, alpha)','Jittered points'],
+  ['geom_segment','pkg','geom_segment(aes(x,y,xend,yend), color, linewidth)','Segments'],
+  ['geom_errorbar','pkg','geom_errorbar(aes(ymin,ymax), width, color)','Error bars'],
+  ['geom_freqpoly','pkg','geom_freqpoly(bins, binwidth, color)','Frequency polygon'],
+  ['geom_hex','pkg','geom_hex(bins)','Hexagonal bin plot'],
+  ['labs','pkg','labs(title, subtitle, x, y, color, fill, caption)','All labels'],
+  ['ggtitle','pkg','ggtitle(label, subtitle)','Plot title'],
+  ['xlab','pkg','xlab(label)','X-axis label'],
+  ['ylab','pkg','ylab(label)','Y-axis label'],
+  ['xlim','pkg','xlim(...)','Set x limits'],
+  ['ylim','pkg','ylim(...)','Set y limits'],
+  ['scale_color_manual','pkg','scale_color_manual(values, name)','Manual colour scale'],
+  ['scale_fill_manual','pkg','scale_fill_manual(values, name)','Manual fill scale'],
+  ['scale_color_gradient','pkg','scale_color_gradient(low, high, name)','Colour gradient'],
+  ['scale_color_viridis_c','pkg','scale_color_viridis_c(option, direction)','Viridis continuous'],
+  ['scale_color_viridis_d','pkg','scale_color_viridis_d(option, direction)','Viridis discrete'],
+  ['scale_x_continuous','pkg','scale_x_continuous(breaks, labels, limits)','Continuous x scale'],
+  ['scale_y_continuous','pkg','scale_y_continuous(breaks, labels, limits)','Continuous y scale'],
+  ['scale_x_log10','pkg','scale_x_log10(name, breaks, labels)','Log-10 x scale'],
+  ['scale_y_log10','pkg','scale_y_log10(name, breaks, labels)','Log-10 y scale'],
+  ['scale_x_date','pkg','scale_x_date(date_labels, breaks)','Date x scale'],
+  ['scale_fill_brewer','pkg','scale_fill_brewer(palette, direction)','ColorBrewer fill'],
+  ['scale_color_brewer','pkg','scale_color_brewer(palette, direction)','ColorBrewer colour'],
+  ['theme','pkg','theme(axis.title, panel.background, legend.position, ...)','Modify theme'],
+  ['theme_bw','pkg','theme_bw(base_size)','Black-and-white theme'],
+  ['theme_classic','pkg','theme_classic(base_size)','Classic theme'],
+  ['theme_minimal','pkg','theme_minimal(base_size)','Minimal theme'],
+  ['theme_void','pkg','theme_void()','Empty theme'],
+  ['theme_dark','pkg','theme_dark(base_size)','Dark theme'],
+  ['element_text','pkg','element_text(family, face, colour, size, angle)','Text element for theme()'],
+  ['element_blank','pkg','element_blank()','Blank/remove element'],
+  ['facet_wrap','pkg','facet_wrap(~var, nrow, ncol, scales)','Wrapped facets'],
+  ['facet_grid','pkg','facet_grid(rows~cols, scales)','Grid facets'],
+  ['coord_flip','pkg','coord_flip()','Flip axes'],
+  ['coord_polar','pkg','coord_polar(theta)','Polar coordinates'],
+  ['coord_cartesian','pkg','coord_cartesian(xlim, ylim, expand)','Zoom without clipping'],
+  ['annotate','pkg','annotate(geom, x, y, label, color)','Add annotation'],
+  ['guides','pkg','guides(color=guide_legend(), fill=guide_colorbar())','Set legend guides'],
+  ['position_dodge','pkg','position_dodge(width)','Dodge overlapping objects'],
+  ['position_jitter','pkg','position_jitter(width, height, seed)','Jitter points'],
+  ['position_stack','pkg','position_stack(vjust)','Stack objects'],
+  // dplyr
+  ['filter','pkg','filter(.data, ...)','Keep matching rows'],
+  ['select','pkg','select(.data, ...)','Select columns'],
+  ['mutate','pkg','mutate(.data, new=expr, ...)','Add/transform columns'],
+  ['group_by','pkg','group_by(.data, ...)','Group by variables'],
+  ['ungroup','pkg','ungroup(x)','Remove grouping'],
+  ['summarise','pkg','summarise(.data, stat=expr)','Summarise groups'],
+  ['arrange','pkg','arrange(.data, ..., .by_group)','Sort rows'],
+  ['distinct','pkg','distinct(.data, ..., .keep_all)','Unique rows'],
+  ['left_join','pkg','left_join(x, y, by, suffix)','Left join'],
+  ['right_join','pkg','right_join(x, y, by)','Right join'],
+  ['inner_join','pkg','inner_join(x, y, by)','Inner join'],
+  ['full_join','pkg','full_join(x, y, by)','Full outer join'],
+  ['anti_join','pkg','anti_join(x, y, by)','Anti join'],
+  ['rename','pkg','rename(.data, new=old)','Rename columns'],
+  ['bind_rows','pkg','bind_rows(..., .id)','Bind rows'],
+  ['bind_cols','pkg','bind_cols(...)','Bind columns'],
+  ['pull','pkg','pull(.data, var)','Extract column as vector'],
+  ['count','pkg','count(.data, ..., wt, sort, name)','Count by group'],
+  ['across','pkg','across(.cols, .fns)','Apply across columns'],
+  ['case_when','pkg','case_when(...)','Multi-condition if-else'],
+  ['if_else','pkg','if_else(condition, true, false)','Strict vectorised if-else'],
+  ['lag','pkg','lag(x, n, default)','Lag a vector'],
+  ['lead','pkg','lead(x, n, default)','Lead a vector'],
+  ['n','pkg','n()','Count rows in group'],
+  ['n_distinct','pkg','n_distinct(..., na.rm)','Count distinct values'],
+  ['row_number','pkg','row_number(x)','Row number / rank'],
+  ['slice_head','pkg','slice_head(.data, n, prop)','First n rows per group'],
+  ['slice_tail','pkg','slice_tail(.data, n, prop)','Last n rows per group'],
+  ['slice_min','pkg','slice_min(.data, order_by, n)','Rows with smallest values'],
+  ['slice_max','pkg','slice_max(.data, order_by, n)','Rows with largest values'],
+  ['between','pkg','between(x, left, right)','Detect values in range'],
+  ['starts_with','pkg','starts_with(match)','Select cols by prefix'],
+  ['ends_with','pkg','ends_with(match)','Select cols by suffix'],
+  ['contains','pkg','contains(match)','Select cols by substring'],
+  ['everything','pkg','everything()','Select all columns'],
+  ['where','pkg','where(fn)','Select cols matching predicate'],
+  // tidyr
+  ['pivot_wider','pkg','pivot_wider(data, names_from, values_from)','Long → wide'],
+  ['pivot_longer','pkg','pivot_longer(data, cols, names_to, values_to)','Wide → long'],
+  ['drop_na','pkg','drop_na(data, ...)','Drop NA rows'],
+  ['fill','pkg','fill(data, ..., .direction)','Fill missing values'],
+  ['replace_na','pkg','replace_na(data, replace)','Replace NA values'],
+  ['separate','pkg','separate(data, col, into, sep)','Split column'],
+  ['unite','pkg','unite(data, col, ..., sep)','Unite columns'],
+  ['unnest','pkg','unnest(data, cols)','Unnest list-column'],
+  ['nest','pkg','nest(.data)','Nest into list-column'],
+  ['complete','pkg','complete(data, ..., fill)','Complete missing combos'],
+  // values
+  ['TRUE','val','TRUE','Logical true'],
+  ['FALSE','val','FALSE','Logical false'],
+  ['NULL','val','NULL','Null object'],
+  ['NA','val','NA','Missing value'],
+  ['Inf','val','Inf','Positive infinity'],
+  ['NaN','val','NaN','Not a number'],
+  ['pi','val','pi','π constant (3.14159…)'],
+  ['LETTERS','val','LETTERS','Built-in: A–Z'],
+  ['letters','val','letters','Built-in: a–z'],
+].map(([n,t,s,d]) => ({name:n, type:t, sig:s, desc:d}));
+
+const ed    = $('ed');
+const acBox = $('ac');
+const ewrap = $('ewrap');
+
+function wordBefore(ta) {
+  const t = ta.value.substring(0, ta.selectionStart);
+  const m = t.match(/[A-Za-z_\.][A-Za-z0-9_\.]*$/);
+  return m ? m[0] : '';
+}
+
+function showAC(ta) {
+  if (!acOn) return;
+  const w = wordBefore(ta);
+  if (w.length < 2) { hideAC(); return; }
+  const wl = w.toLowerCase();
+  const pre = RFNS.filter(f => f.name.toLowerCase().startsWith(wl) && f.name !== w);
+  const con = RFNS.filter(f => !f.name.toLowerCase().startsWith(wl) && f.name.toLowerCase().includes(wl));
+  const all = [...pre, ...con].slice(0, 10);
+  if (!all.length) { hideAC(); return; }
+  acList = all; acIdx = -1;
+  renderACList();
+  acBox.style.display = 'flex';
+  posAC(ta);
+  // Async R-native completions
+  clearTimeout(acTimer);
+  if (ready) acTimer = setTimeout(() => fetchRCompletions(ta, w), 280);
+}
+
+async function fetchRCompletions(ta, trigger) {
+  try {
+    const line = ta.value.substring(0, ta.selectionStart);
+    const esc  = line.replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/`/g,'\\`');
+    const res  = await webR.evalR(`local({utils:::.assignLinebuffer("${esc}");utils:::.assignEnd(${line.length}L);utils:::.guessTokenFromLine();utils:::.completeToken();utils:::.retrieveCompletions()})`);
+    const rC   = await res.toArray();
+    res.destroy?.();
+    if (acBox.style.display === 'none' || wordBefore(ta) !== trigger) return;
+    const rNames = new Set(rC.slice(0, 15));
+    const merged = [];
+    for (const name of rNames) {
+      if (!name) continue;
+      const ex = RFNS.find(f => f.name === name);
+      merged.push(ex || { name, type: 'var', sig: name, desc: 'R environment' });
+    }
+    const wl = trigger.toLowerCase();
+    const extra = RFNS.filter(f => f.name.toLowerCase().startsWith(wl) && !rNames.has(f.name));
+    const final = [...merged, ...extra].slice(0, 10);
+    if (final.length > 0 && acBox.style.display !== 'none') {
+      acList = final; acIdx = -1; renderACList();
+    }
+  } catch(_) {}
+}
+
+function renderACList() {
+  $('ac-list').innerHTML = acList.map((f, i) =>
+    `<div class="ac-item" data-i="${i}" data-name="${f.name}">` +
+    `<div class="ac-ic ${f.type}">${{plot:'◎',pkg:'⊕',ctrl:'⬡',val:'◈',var:'$',fn:'ƒ'}[f.type]||'ƒ'}</div>` +
+    `<span class="ac-nm">${f.name}</span><span class="ac-ty">${f.type}</span></div>`
+  ).join('');
+  $('ac-list').querySelectorAll('.ac-item').forEach(el =>
+    el.addEventListener('mousedown', ev => { ev.preventDefault(); applyAC(el.dataset.name); })
+  );
+  $('ac-detail').style.display = 'none';
+}
+
+function posAC(ta) {
+  const lines = ta.value.substring(0, ta.selectionStart).split('\n');
+  const lh    = parseFloat(getComputedStyle(ta).lineHeight) || 22.1;
+  const top   = lines.length * lh - ta.scrollTop;
+  const charW = parseFloat(getComputedStyle(ta).fontSize) * 0.6 || 7.8;
+  const curX  = 16 + lines[lines.length-1].length * charW; // 16 = ed padding-left
+  const left  = parseInt(getComputedStyle($('lnum-col')).width || '46') + curX;
+  acBox.style.top  = Math.max(0, Math.min(top,   ta.clientHeight - 230)) + 'px';
+  acBox.style.left = Math.max(46, Math.min(left,  ewrap.clientWidth - 280)) + 'px';
+}
+
+function hiAC(i) {
+  $('ac-list').querySelectorAll('.ac-item').forEach((el, j) => el.classList.toggle('sel', j === i));
+  const f = acList[i];
+  if (f) {
+    $('ac-sig').textContent  = f.sig;
+    $('ac-desc').textContent = f.desc || '';
+    $('ac-detail').style.display = 'block';
+  } else { $('ac-detail').style.display = 'none'; }
+}
+
+function hideAC() { acBox.style.display = 'none'; acList = []; acIdx = -1; clearTimeout(acTimer); }
+
+function applyAC(name) {
+  const pos = ed.selectionStart, val = ed.value;
+  const before = val.substring(0, pos);
+  const m = before.match(/[A-Za-z_\.][A-Za-z0-9_\.]*$/);
+  if (!m) return;
+  const start = pos - m[0].length;
+  const bare  = ['TRUE','FALSE','NULL','NA','Inf','NaN','pi','LETTERS','letters'];
+  const ins   = bare.includes(name) ? name : name + '()';
+  ed.value = val.substring(0, start) + ins + val.substring(pos);
+  ed.selectionStart = ed.selectionEnd = bare.includes(name) ? start + ins.length : start + name.length + 1;
+  hideAC();
+  setTimeout(() => { updateHighlight(); updateLnums(); }, 0);
+  ed.focus();
+}
+
+
+// ── Save / Open R Script
+window.saveScript = function() {
+  const code = $('ed').value;
+  const blob = new Blob([code], { type: 'text/plain' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'script.R'; a.click(); URL.revokeObjectURL(a.href);
+};
+window.openScript = function() { $('script-input').click(); };
+window.onScriptOpen = function(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    $('ed').value = ev.target.result;
+    updateHighlight(); updateLnums();
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+};
+
+ed.addEventListener('input',  () => { updateHighlight(); updateLnums(); showAC(ed); });
+ed.addEventListener('blur',   () => setTimeout(hideAC, 180));
+ed.addEventListener('click',  hideAC);
+ed.addEventListener('scroll', () => {
+  // Sync line numbers scroll
+  lnums.style.transform = `translateY(${-ed.scrollTop}px)`;
+  // Sync highlight scroll
+  const hl = $('hl');
+  if (hl) { hl.scrollTop = ed.scrollTop; hl.scrollLeft = ed.scrollLeft; }
+  posAC(ed);
+});
+
+// ── Editor keydown: AC nav + bracket pairs + shortcuts
+ed.addEventListener('keydown', e => {
+  // AC navigation
+  if (acBox.style.display !== 'none') {
+    if (e.key === 'ArrowDown') { e.preventDefault(); acIdx = Math.min(acIdx+1, acList.length-1); hiAC(acIdx); return; }
+    if (e.key === 'ArrowUp')   { e.preventDefault(); acIdx = Math.max(acIdx-1, -1);              hiAC(acIdx); return; }
+    if (e.key === 'Tab' || e.key === 'Enter') {
+      e.preventDefault();
+      (acIdx >= 0 && acList[acIdx]) ? applyAC(acList[acIdx].name) : acList[0] ? applyAC(acList[0].name) : hideAC();
+      return;
+    }
+    if (e.key === 'Escape') { e.preventDefault(); hideAC(); return; }
+  }
+
+  // Ctrl/Cmd+Enter → run
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); hideAC(); runCode(); return; }
+
+  // Tab → 2 spaces
+  if (e.key === 'Tab' && acBox.style.display === 'none') {
+    e.preventDefault();
+    const s = ed.selectionStart, end = ed.selectionEnd;
+    if (s !== end) {
+      const mid = ed.value.substring(s, end).replace(/^/mg, '  ');
+      ed.value = ed.value.substring(0,s) + mid + ed.value.substring(end);
+      ed.selectionStart = s; ed.selectionEnd = s + mid.length;
+    } else {
+      ed.value = ed.value.substring(0,s) + '  ' + ed.value.substring(s);
+      ed.selectionStart = ed.selectionEnd = s + 2;
+    }
+    updateHighlight(); updateLnums(); return;
+  }
+
+  if (!bpOn) return;
+
+  const pos = ed.selectionStart, posE = ed.selectionEnd;
+  const val = ed.value, sel = val.substring(pos, posE), next = val[pos];
+  const PAIRS = { '(':')', '[':']', '{':'}', '"':'"', "'":"'" };
+
+  if (PAIRS[e.key]) {
+    if ((e.key==='"'||e.key==="'") && next===e.key && !sel) {
+      e.preventDefault(); ed.selectionStart = ed.selectionEnd = pos+1;
+      setTimeout(() => { updateHighlight(); updateLnums(); }, 0); return;
+    }
+    e.preventDefault();
+    const cl = PAIRS[e.key];
+    if (sel) {
+      ed.value = val.substring(0,pos)+e.key+sel+cl+val.substring(posE);
+      ed.selectionStart = pos+1; ed.selectionEnd = posE+1;
+    } else {
+      ed.value = val.substring(0,pos)+e.key+cl+val.substring(pos);
+      ed.selectionStart = ed.selectionEnd = pos+1;
+    }
+    setTimeout(() => { updateHighlight(); updateLnums(); }, 0);
+    showAC(ed); return;
+  }
+  if ((e.key===')'&&next===')')||(e.key===']'&&next===']')||(e.key==='}'&&next==='}')) {
+    if (!sel) { e.preventDefault(); ed.selectionStart = ed.selectionEnd = pos+1;
+      setTimeout(() => { updateHighlight(); updateLnums(); }, 0); return; }
+  }
+  if (e.key==='Backspace' && !sel) {
+    const prev = val[pos-1];
+    if (PAIRS[prev] && val[pos]===PAIRS[prev]) {
+      e.preventDefault();
+      ed.value = val.substring(0,pos-1)+val.substring(pos+1);
+      ed.selectionStart = ed.selectionEnd = pos-1;
+      setTimeout(() => { updateHighlight(); updateLnums(); }, 0); return;
+    }
+  }
+  if (e.key==='Enter' && !sel && val[pos-1]==='{' && val[pos]==='}') {
+    e.preventDefault();
+    const ls = val.lastIndexOf('\n',pos-1)+1;
+    const indent = val.substring(ls,pos).match(/^\s*/)[0];
+    const ins = '\n'+indent+'  \n'+indent;
+    ed.value = val.substring(0,pos)+ins+val.substring(pos);
+    ed.selectionStart = ed.selectionEnd = pos+indent.length+3;
+  }
+  // Update line numbers after any change
+  setTimeout(() => { updateHighlight(); updateLnums(); }, 0);
+});
+
+// ── Tab switching
+window.goTab = function(t) {
+  document.querySelectorAll('.pane').forEach(p => p.classList.remove('on'));
+  document.querySelectorAll('.nt').forEach(b  => b.classList.remove('on'));
+  $('P-'+t).classList.add('on');
+  $('T-'+t).classList.add('on');
+  if (t === 'plots') $('T-plots').classList.remove('has-badge');
+};
+
+// ── Reset session
+window.resetSession = async function() {
+  if (!confirm('Reset R session? All variables will be lost.')) return;
+  ready = false; setSt('s-load', 'Restarting…');
+  $('lo').classList.remove('gone');
+  installedPkgs.clear(); uploadedFiles = [];
+  try { await webR.destroy?.(); } catch(_) {}
+  setTimeout(boot, 300);
+};
+
+// ── Initial line numbers + boot
+updateHighlight();
+updateLnums();
+boot();
+</script>
+</body>
+</html>
