@@ -1,87 +1,91 @@
-/* R-IDE Service Worker — v3
-   Caches the app shell for offline use.
-   WebR's own WASM/package files are handled by WebR itself.
+/* R-IDE Service Worker — GitHub Pages Edition
+   ─────────────────────────────────────────────
+   OTA UPDATES: bump APP_VERSION to force all clients to get fresh files.
+   Just change the version string, commit & push — users get the update
+   automatically on next visit (after one background refresh cycle).
 */
 
-const CACHE_NAME = 'ride-v4';
+const APP_VERSION = '1.0.0'; // ← bump this on every release
+const CACHE_NAME  = `ride-${APP_VERSION}`;
 
-// Files to cache on install — the "app shell"
 const SHELL_FILES = [
   './',
   './index.html',
+  './manifest.json',
   './coi-serviceworker.js',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
 ];
 
-// ── INSTALL: cache the app shell immediately
+// ── INSTALL: cache app shell immediately
 self.addEventListener('install', event => {
+  console.log(`[SW] Installing v${APP_VERSION}…`);
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(SHELL_FILES))
-      .then(() => self.skipWaiting())   // activate right away, don't wait for old SW to die
+      .then(() => self.skipWaiting())
       .catch(err => console.warn('[SW] Install cache failed:', err))
   );
 });
 
-// ── ACTIVATE: delete any old caches from previous versions
+// ── ACTIVATE: delete all old version caches
 self.addEventListener('activate', event => {
+  console.log(`[SW] Activating v${APP_VERSION}`);
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
         keys
-          .filter(key => key !== CACHE_NAME)   // any cache that isn't the current version
-          .map(key => {
-            console.log('[SW] Deleting old cache:', key);
-            return caches.delete(key);
-          })
+          .filter(k => k.startsWith('ride-') && k !== CACHE_NAME)
+          .map(k => { console.log('[SW] Deleting old cache:', k); return caches.delete(k); })
       ))
-      .then(() => self.clients.claim())   // take control of all open tabs immediately
+      .then(() => self.clients.claim())
+      .then(() => {
+        self.clients.matchAll({ type: 'window' }).then(clients => {
+          clients.forEach(client => client.postMessage({ type: 'SW_UPDATED', version: APP_VERSION }));
+        });
+      })
   );
 });
 
-// ── FETCH: decide what to serve from cache vs network
+// ── FETCH: smart caching strategy
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Only handle same-origin requests (not WebR CDN, Google Fonts, etc.)
-  if (url.origin !== self.location.origin) {
-    // Let external requests (WebR WASM, CDN packages, fonts) go straight to network
-    // WebR handles its own caching internally
+  // External requests (WebR WASM, CDN, fonts) go straight to network
+  if (url.origin !== self.location.origin) return;
+
+  // SW files always fetched fresh
+  if (url.pathname.endsWith('sw.js') || url.pathname.endsWith('coi-serviceworker.js')) {
+    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
     return;
   }
 
-  const isShellFile =
+  const isShell =
     url.pathname.endsWith('.html') ||
+    url.pathname.endsWith('.json') ||
     url.pathname.endsWith('.png')  ||
-    url.pathname === '/'           ||
-    url.pathname === '';
+    url.pathname.endsWith('.jpg')  ||
+    url.pathname === new URL('./', self.location).pathname ||
+    url.pathname === '/';
 
-  if (isShellFile) {
-    // Cache-first strategy for shell files:
-    // Serve from cache instantly, then update cache in background
+  if (isShell) {
+    // Stale-while-revalidate: serve instantly from cache, update in background
     event.respondWith(
-      caches.match(event.request).then(cached => {
-        const networkFetch = fetch(event.request)
-          .then(response => {
-            if (response.ok) {
-              // Update the cache silently in the background
-              caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
-            }
-            return response;
-          })
-          .catch(() => cached);  // if network fails, return what we have cached
-
-        return cached || networkFetch;  // cached copy first, or wait for network
-      })
+      caches.open(CACHE_NAME).then(cache =>
+        cache.match(event.request).then(cached => {
+          const networkFetch = fetch(event.request).then(res => {
+            if (res.ok) cache.put(event.request, res.clone());
+            return res;
+          }).catch(() => cached);
+          return cached || networkFetch;
+        })
+      )
     );
     return;
   }
 
-  // For everything else (sw.js itself, any other local files):
-  // Network-first, fall back to cache
+  // Network-first for everything else
   event.respondWith(
-    fetch(event.request)
-      .catch(() => caches.match(event.request))
+    fetch(event.request).catch(() => caches.match(event.request))
   );
 });

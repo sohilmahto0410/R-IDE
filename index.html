@@ -24,7 +24,7 @@
   --spring:cubic-bezier(.34,1.56,.64,1);
   --smooth:cubic-bezier(.4,0,.2,1);
   --decel:cubic-bezier(0,0,.2,1);
-  --lnum-w:46px;
+  --lnum-w:38px;
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{height:100%;background:#141218;overscroll-behavior:none}
@@ -55,6 +55,18 @@ body{height:100%;overflow:hidden;background:#141218;color:var(--on-s);
 .lo-track{width:220px;height:4px;background:var(--s4);border-radius:2px;overflow:hidden}
 .lo-fill{height:100%;background:linear-gradient(90deg,var(--pri-con),var(--pri));
   width:0%;border-radius:2px;transition:width .5s var(--smooth)}
+
+/* ── OTA UPDATE TOAST ── */
+#ota-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);
+  z-index:9999;background:var(--s3);border:1px solid var(--pri-con);border-radius:24px;
+  padding:10px 8px 10px 16px;display:flex;align-items:center;gap:10px;
+  box-shadow:0 4px 24px rgba(0,0,0,.5);font-size:12px;color:var(--on-s);
+  font-family:'Google Sans',sans-serif;white-space:nowrap;
+  transition:transform .4s cubic-bezier(.34,1.56,.64,1);pointer-events:none;opacity:0}
+#ota-toast.show{transform:translateX(-50%) translateY(0);pointer-events:all;opacity:1}
+#ota-toast button{padding:5px 14px;border-radius:16px;border:none;
+  background:var(--pri-con);color:var(--on-pri-con);font-size:11.5px;
+  font-weight:600;cursor:pointer;font-family:'Google Sans',sans-serif}
 
 /* ── HEADER ── */
 #hdr{height:52px;background:var(--s1);border-bottom:1px solid var(--outv);
@@ -129,14 +141,14 @@ body{height:100%;overflow:hidden;background:#141218;color:var(--on-s);
 /* ── EDITOR PANE ── */
 #etb{background:var(--s2);border-bottom:1px solid var(--outv);
   padding:6px 10px;display:flex;align-items:center;gap:6px;flex-shrink:0;overflow:hidden}
-.etb-icon{width:32px;height:32px;padding:0;justify-content:center;font-size:16px;flex-shrink:0}
+.etb-icon{height:30px;padding:0 10px;justify-content:center;font-size:12px;flex-shrink:0;border-radius:20px;gap:4px}
 /* line numbers + editor */
 #ewrap{position:relative;flex:1;display:flex;overflow:hidden}
 #lnum-col{width:var(--lnum-w);background:var(--lnum-bg);border-right:1px solid var(--outv);
   overflow:hidden;flex-shrink:0;position:relative;user-select:none}
 #lnums{position:absolute;top:0;right:0;
-  padding:14px 8px 200px 4px;
-  font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.7;
+  padding:14px 4px 200px 2px;
+  font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.7;
   color:var(--lnum-fg);text-align:right;white-space:pre;pointer-events:none;
   will-change:transform}
 .lnum-active{color:var(--pri);font-weight:500}
@@ -293,6 +305,12 @@ body{height:100%;overflow:hidden;background:#141218;color:var(--on-s);
 .pkg-b.av{background:rgba(96,165,250,.15);color:#60A5FA}
 .pkg-b.av:hover{background:rgba(96,165,250,.25);transform:scale(1.05)}
 .pkg-b.ok{background:rgba(134,239,172,.12);color:var(--ter);cursor:default}
+.pkg-loaded{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--outv);
+  background:transparent;cursor:pointer;flex-shrink:0;display:flex;align-items:center;
+  justify-content:center;font-size:11px;transition:all .2s;color:transparent}
+.pkg-loaded.on{background:rgba(134,239,172,.2);border-color:var(--ter);color:var(--ter)}
+.pkg-section{padding:8px 14px 4px;font-size:10.5px;font-weight:600;
+  color:var(--out);letter-spacing:.8px;text-transform:uppercase}
 
 /* ── SETTINGS — Android-safe scroll fix ── */
 #P-settings{overflow:hidden}
@@ -341,12 +359,19 @@ body{height:100%;overflow:hidden;background:#141218;color:var(--on-s);
 <body>
 
 <div id="app-shell">
+
+<!-- OTA UPDATE TOAST -->
+<div id="ota-toast">⚡ New version available! <button onclick="location.reload()">Update now</button></div>
+
+
 <!-- LOADING -->
 <div id="lo">
   <div class="lo-icon">R</div>
   <div class="lo-title">R-IDE</div>
   <div class="lo-sub" id="lo-msg">Initialising WebR engine…<br>First load ~10 MB, cached offline after.</div>
   <div class="lo-track"><div class="lo-fill" id="lo-bar"></div></div>
+  <div id="lo-err" style="display:none;margin-top:18px;background:rgba(242,184,181,.12);border:1px solid rgba(242,184,181,.35);border-radius:12px;padding:14px 18px;max-width:340px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:11px;color:#F2B8B5;line-height:1.7"></div>
+  <button id="lo-retry" onclick="location.reload()" style="display:none;margin-top:12px;padding:8px 24px;border-radius:20px;border:none;background:#4F378B;color:#EADDFF;font-family:'Google Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer">↺ Retry</button>
 </div>
 
 <!-- HEADER -->
@@ -377,8 +402,8 @@ body{height:100%;overflow:hidden;background:#141218;color:var(--on-s);
       <button class="btn btn-run"    id="runbtn"  onclick="runCode()">▶ Run</button>
       <button class="btn btn-tonal"  id="selbtn"  onclick="runSel()">▶ Sel</button>
       <button class="btn btn-danger" id="clearbtn" onclick="edClear()">✕ Clear</button>
-      <button class="btn btn-tonal etb-icon" onclick="openScript()" title="Open .R file">📂</button>
-      <button class="btn btn-tonal etb-icon" onclick="saveScript()" title="Save .R file">💾</button>
+      <button class="btn btn-tonal etb-icon" onclick="openScript()" title="Open .R file">📂 Open</button>
+      <button class="btn btn-tonal etb-icon" onclick="saveScript()" title="Save .R file">💾 Save</button>
       <input type="file" id="script-input" accept=".r,.R,.rscript,.txt" style="display:none" onchange="onScriptOpen(event)">
     </div>
     <div id="ewrap">
@@ -512,13 +537,19 @@ grid(col = "grey80")
         <div class="s-row"><div><div>Plotting</div><div class="s-sub">captureR images → Plots tab</div></div><span class="cap y">✓ Yes</span></div>
         <div class="s-row"><div><div>File I/O</div><div class="s-sub">Upload files → virtual /uploads/ filesystem</div></div><span class="cap y">✓ Yes</span></div>
         <div class="s-row"><div><div>Offline mode</div><div class="s-sub">Cached by PWA after first load</div></div><span class="cap y">✓ Yes</span></div>
-        <div class="s-row"><div><div>system() shell calls</div><div class="s-sub">Not available in WebAssembly</div></div><span class="cap n">✗ No</span></div>
       </div>
 
       <div class="sg">
         <div class="sg-t">Session</div>
         <div class="s-row"><div>Clear Console</div><button class="btn btn-tonal" onclick="clearConsole()">Clear</button></div>
         <div class="s-row"><div>Reset R Session</div><button class="btn btn-danger" onclick="resetSession()">Reset</button></div>
+      </div>
+
+      <div style="display:flex;justify-content:center;padding:18px 0 8px">
+        <div style="padding:6px 18px;border-radius:20px;border:1px solid var(--outv);
+          font-size:11px;color:var(--out);font-family:'Google Sans',sans-serif;letter-spacing:.3px">
+          ✦ Crafted by <span style="color:var(--pri);font-weight:500">Sohil Mahto</span>
+        </div>
       </div>
     </div>
   </div>
@@ -534,6 +565,7 @@ import { WebR } from 'https://webr.r-wasm.org/latest/webr.mjs';
 let webR, ready = false;
 let rHist = [], hIdx = -1;
 let installedPkgs = new Set();
+let loadedPkgs = new Set();
 let acOn = true, bpOn = true;
 let acIdx = -1, acList = [];
 let acTimer = null;
@@ -612,12 +644,20 @@ function updateHighlight() {
   hl.innerHTML = highlightR($('ed').value) + '\n';
 }
 
-// ── PWA — manifest (dynamic blob), service worker, install prompt
+// ── PWA — service worker
 function setupPWA() {
-  // Register external sw.js — PWABuilder and TWA require a real fetchable service worker
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js', { scope: './' })
-      .then(reg => console.log('[R-IDE] SW registered:', reg.scope))
+      .then(reg => {
+        console.log('[R-IDE] SW registered:', reg.scope);
+        // Listen for OTA update messages from the new SW
+        navigator.serviceWorker.addEventListener('message', e => {
+          if (e.data?.type === 'SW_UPDATED') {
+            const toast = document.getElementById('ota-toast');
+            if (toast) toast.classList.add('show');
+          }
+        });
+      })
       .catch(err => console.warn('[R-IDE] SW registration failed:', err));
   }
 }
@@ -628,24 +668,65 @@ setupPWA();
 function setLoad(p, m) { $('lo-bar').style.width = p + '%'; $('lo-msg').textContent = m; }
 function setSt(c, t)   { $('status').className = c; $('stxt').textContent = t; }
 
+// ── Boot error display
+function bootError(msg) {
+  const errEl = $('lo-err');
+  const retryEl = $('lo-retry');
+  errEl.innerHTML = msg;
+  errEl.style.display = 'block';
+  retryEl.style.display = 'inline-block';
+  $('lo-bar').style.background = '#F2B8B5';
+  setSt('s-err', 'Failed');
+}
+
 // ── Boot
 async function boot() {
-  setLoad(8, 'Creating WebR instance…');
-  webR = new WebR();
-  setLoad(18, 'Downloading WebR (~10 MB first time, cached after)…');
-  await webR.init();
-  setLoad(88, 'Setting up environment…');
-  try { await webR.FS.mkdir('/uploads'); } catch(_) {}
-  await webR.evalRVoid('invisible(NULL)');
-  setLoad(100, 'Ready!');
-  await wait(300);
-  ready = true;
-  $('lo').classList.add('gone');
-  setSt('s-ok', 'Ready');
-  log('✓ R is running via WebR!', 'ok');
-  log('ℹ Ctrl+Enter or ▶ Run to execute.  Plots → Plots tab.', 'inf');
-  renderPkgs('');
-  updateLnums();
+  // Check SharedArrayBuffer availability (requires COOP+COEP headers)
+  if (typeof SharedArrayBuffer === 'undefined') {
+    bootError(
+      '⚠ <b>SharedArrayBuffer unavailable</b><br><br>' +
+      'This page is missing Cross-Origin Isolation headers.<br>' +
+      'If you just deployed, wait 1–2 min and retry.<br><br>' +
+      '<b>Netlify fix:</b> ensure <code>_headers</code> file is in your deploy folder.<br>' +
+      '<b>crossOriginIsolated:</b> ' + self.crossOriginIsolated
+    );
+    return;
+  }
+
+  try {
+    setLoad(8, 'Creating WebR instance…');
+    webR = new WebR();
+
+    setLoad(18, 'Downloading WebR (~10 MB first time)…');
+
+    // 90-second timeout — if WebR hangs, show a useful error
+    const initTimeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('WebR init timed out after 90s. Check your network connection.')), 90000)
+    );
+    await Promise.race([webR.init(), initTimeout]);
+
+    setLoad(88, 'Setting up environment…');
+    try { await webR.FS.mkdir('/uploads'); } catch(_) {}
+    await webR.evalRVoid('invisible(NULL)');
+
+    setLoad(100, 'Ready!');
+    await wait(300);
+    ready = true;
+    $('lo').classList.add('gone');
+    setSt('s-ok', 'Ready');
+    log('✓ R is running via WebR!', 'ok');
+    log('ℹ Ctrl+Enter or ▶ Run to execute.  Plots → Plots tab.', 'inf');
+    renderPkgs('');
+    updateLnums();
+
+  } catch(err) {
+    console.error('[R-IDE] Boot failed:', err);
+    bootError(
+      '✗ <b>WebR failed to load</b><br><br>' +
+      (err.message || String(err)) + '<br><br>' +
+      'Try refreshing. If this persists, check browser console (F12).'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════
@@ -1021,15 +1102,59 @@ const PKGS = [
 ];
 window.renderPkgs = function(f = '') {
   const el = $('plist'); el.innerHTML = '';
-  const show = f ? PKGS.filter(p => p.n.toLowerCase().includes(f.toLowerCase())) : PKGS;
+  const filter = f.toLowerCase();
+  const show = f ? PKGS.filter(p => p.n.toLowerCase().includes(filter)) : PKGS;
   if (!show.length) { el.innerHTML = '<div style="padding:14px;font-size:12px;color:var(--out)">Type a name & press Install.</div>'; return; }
-  show.forEach(p => {
-    const ok = installedPkgs.has(p.n);
-    const d  = document.createElement('div'); d.className = 'pkg';
-    d.innerHTML = `<div class="pkg-n">${p.n}</div><div class="pkg-d">${p.d}</div>
-      <button class="pkg-b ${ok?'ok':'av'}" onclick="${ok?'':'installPkg(\''+p.n+'\')'}">${ok?'✓ Installed':'+ Install'}</button>`;
+
+  const installed = show.filter(p => installedPkgs.has(p.n));
+  const available = show.filter(p => !installedPkgs.has(p.n));
+
+  function makeRow(p) {
+    const isLoaded = loadedPkgs.has(p.n);
+    const d = document.createElement('div'); d.className = 'pkg';
+    d.innerHTML =
+      `<div class="pkg-loaded ${isLoaded?'on':''}" title="${isLoaded?'Loaded — click to unload':'Click to load'}"
+        onclick="toggleLoad('${p.n}',this)">✓</div>` +
+      `<div class="pkg-n">${p.n}</div><div class="pkg-d">${p.d}</div>` +
+      `<button class="pkg-b ok" style="cursor:default">✓ Installed</button>`;
     el.appendChild(d);
-  });
+  }
+
+  if (installed.length) {
+    const sec = document.createElement('div'); sec.className = 'pkg-section';
+    sec.textContent = 'Installed'; el.appendChild(sec);
+    installed.forEach(makeRow);
+  }
+  if (available.length) {
+    const sec = document.createElement('div'); sec.className = 'pkg-section';
+    sec.textContent = 'Available'; el.appendChild(sec);
+    available.forEach(p => {
+      const d = document.createElement('div'); d.className = 'pkg';
+      d.innerHTML = `<div class="pkg-n">${p.n}</div><div class="pkg-d">${p.d}</div>
+        <button class="pkg-b av" onclick="installPkg('${p.n}')">+ Install</button>`;
+      el.appendChild(d);
+    });
+  }
+};
+
+window.toggleLoad = async function(name, el) {
+  if (!ready) { log('⚠ Not ready.','wrn'); return; }
+  const isOn = el.classList.contains('on');
+  try {
+    if (isOn) {
+      await webR.evalRVoid(`detach("package:${name}", unload=TRUE)`);
+      loadedPkgs.delete(name);
+      el.classList.remove('on');
+      el.title = 'Click to load';
+      log('📦 ' + name + ' unloaded', 'inf');
+    } else {
+      await webR.evalRVoid(`library(${name})`);
+      loadedPkgs.add(name);
+      el.classList.add('on');
+      el.title = 'Loaded — click to unload';
+      log('✓ ' + name + ' loaded', 'ok');
+    }
+  } catch(e) { log('✗ ' + e.message, 'err'); }
 };
 window.installPkg = async function(name) {
   if (!ready) { log('⚠ Not ready.','wrn'); return; }
@@ -1354,20 +1479,53 @@ function wordBefore(ta) {
   return m ? m[0] : '';
 }
 
+// Extract user-declared variable/function names from editor text
+function extractUserSymbols() {
+  const code = $('ed').value;
+  const symbols = new Set();
+  // Match: varName <- ..., varName = ..., varName <<- ...
+  const assignRe = /^\s*([A-Za-z_.][A-Za-z0-9_.]*(?:\.[A-Za-z0-9_.]+)*)\s*(?:<<?-|=(?!=))/gm;
+  let m;
+  while ((m = assignRe.exec(code)) !== null) symbols.add(m[1]);
+  // Also match function args: function(x, y, z)
+  const fnArgRe = /function\s*\(([^)]+)\)/g;
+  while ((m = fnArgRe.exec(code)) !== null) {
+    m[1].split(',').forEach(a => {
+      const name = a.trim().split('=')[0].trim();
+      if (/^[A-Za-z_.][A-Za-z0-9_.]*$/.test(name)) symbols.add(name);
+    });
+  }
+  return [...symbols].map(n => ({ name: n, type: 'var', sig: n, desc: 'user variable' }));
+}
+
 function showAC(ta) {
   if (!acOn) return;
   const w = wordBefore(ta);
   if (w.length < 2) { hideAC(); return; }
   const wl = w.toLowerCase();
+
+  // User symbols get top priority
+  const userSyms = extractUserSymbols();
+  const userPre = userSyms.filter(f => f.name.toLowerCase().startsWith(wl) && f.name !== w);
+  const userCon = userSyms.filter(f => !f.name.toLowerCase().startsWith(wl) && f.name.toLowerCase().includes(wl));
+
   const pre = RFNS.filter(f => f.name.toLowerCase().startsWith(wl) && f.name !== w);
   const con = RFNS.filter(f => !f.name.toLowerCase().startsWith(wl) && f.name.toLowerCase().includes(wl));
-  const all = [...pre, ...con].slice(0, 10);
+
+  // Merge: user vars first, then built-ins, deduplicated by name
+  const seen = new Set();
+  const all = [];
+  for (const f of [...userPre, ...userCon, ...pre, ...con]) {
+    if (!seen.has(f.name)) { seen.add(f.name); all.push(f); }
+    if (all.length >= 10) break;
+  }
+
   if (!all.length) { hideAC(); return; }
   acList = all; acIdx = -1;
   renderACList();
   acBox.style.display = 'flex';
   posAC(ta);
-  // Async R-native completions
+  // Async R-native completions (catches variables from sourced files, packages etc.)
   clearTimeout(acTimer);
   if (ready) acTimer = setTimeout(() => fetchRCompletions(ta, w), 280);
 }
@@ -1466,9 +1624,82 @@ window.onScriptOpen = function(e) {
   reader.readAsText(file);
 };
 
-ed.addEventListener('input',  () => { updateHighlight(); updateLnums(); showAC(ed); });
-ed.addEventListener('blur',   () => setTimeout(hideAC, 180));
-ed.addEventListener('click',  hideAC);
+// ── Unified input handler (highlight + AC + Android bracket pairs)
+// Diff-based bracket detection works on ALL Android keyboards (Gboard, Samsung, etc.)
+// regardless of inputType, because we compare before/after value directly.
+let edValBefore = '';
+let edPosBefore = 0;
+
+ed.addEventListener('focus', () => {
+  edValBefore = ed.value;
+  edPosBefore = ed.selectionStart;
+});
+
+ed.addEventListener('keydown', e => {
+  // Capture state before every keystroke for the diff
+  edValBefore = ed.value;
+  edPosBefore = ed.selectionStart;
+}, true); // use capture phase so it runs before keydown handler below
+
+ed.addEventListener('input', e => {
+  // ── Bracket + quote pair completion ──
+  if (bpOn) {
+    const valAfter = ed.value;
+    const posAfter = ed.selectionStart;
+
+    // ── QUOTES: use e.data directly (most reliable signal on Android)
+    // Also normalise Gboard smart/curly quotes → straight quotes
+    const SMART_QUOTE_MAP = {
+      '“': '"', '”': '"',   // " "
+      '‘': "'", '’': "'"    // ' '
+    };
+    const rawData = e.data ? (SMART_QUOTE_MAP[e.data] || e.data) : null;
+    const isSmartQuote = e.data && SMART_QUOTE_MAP[e.data] !== undefined;
+
+    if (rawData === '"' || rawData === "'") {
+      const q = rawData;
+      const nextChar = valAfter[posAfter];
+
+      if (isSmartQuote) {
+        // Gboard inserted a curly quote — replace it with straight quote + closing
+        const before = valAfter.substring(0, posAfter - 1); // remove smart quote
+        const after  = valAfter.substring(posAfter);
+        ed.value = before + q + q + after;
+        ed.selectionStart = ed.selectionEnd = posAfter; // cursor between the two quotes
+      } else if (nextChar === q) {
+        // Cursor is already before a closing quote → skip over it
+        ed.value = valAfter.substring(0, posAfter - 1) + valAfter.substring(posAfter);
+        ed.selectionStart = ed.selectionEnd = posAfter;
+      } else {
+        // Normal case: insert closing quote after cursor
+        ed.value = valAfter.substring(0, posAfter) + q + valAfter.substring(posAfter);
+        ed.selectionStart = ed.selectionEnd = posAfter;
+      }
+
+    // ── BRACKETS: diff-based (e.data is always correct for brackets on all keyboards)
+    } else {
+      const PAIRS = { '(':')', '[':']', '{':'}' };
+      const inserted = valAfter.substring(edPosBefore, posAfter);
+      const deletedLen = (edValBefore.length + inserted.length) - valAfter.length;
+      if (inserted.length === 1 && deletedLen === 0 && PAIRS[inserted]) {
+        const cl = PAIRS[inserted];
+        ed.value = valAfter.substring(0, posAfter) + cl + valAfter.substring(posAfter);
+        ed.selectionStart = ed.selectionEnd = posAfter;
+      }
+    }
+
+    // Update snapshot for next event
+    edValBefore = ed.value;
+    edPosBefore = ed.selectionStart;
+  }
+
+  updateHighlight();
+  updateLnums();
+  showAC(ed);
+});
+
+ed.addEventListener('blur',  () => setTimeout(hideAC, 180));
+ed.addEventListener('click', hideAC);
 ed.addEventListener('scroll', () => {
   // Sync line numbers scroll
   lnums.style.transform = `translateY(${-ed.scrollTop}px)`;

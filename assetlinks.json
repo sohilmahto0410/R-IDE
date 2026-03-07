@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.netlify.rideonline.twa",
+        "sha256_cert_fingerprints": ["01:A8:34:43:13:4E:60:33:3B:6D:2B:48:48:C8:08:18:BE:E9:1C:1B:6C:EC:77:1E:60:A9:F8:3E:86:E7:A1:39"]
+      }
+    }]
