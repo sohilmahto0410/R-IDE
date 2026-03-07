@@ -33,13 +33,18 @@ self.addEventListener('activate', event => {
   console.log(`[SW] Activating v${APP_VERSION}`);
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(
-        keys
-          .filter(k => k.startsWith('ride-') && k !== CACHE_NAME)
-          .map(k => { console.log('[SW] Deleting old cache:', k); return caches.delete(k); })
-      ))
-      .then(() => self.clients.claim())
-      .then(() => {
+      .then(keys => {
+        const oldKeys = keys.filter(k => k.startsWith('ride-') && k !== CACHE_NAME);
+        const isUpdate = oldKeys.length > 0; // only true when replacing an existing version
+        return Promise.all(oldKeys.map(k => {
+          console.log('[SW] Deleting old cache:', k);
+          return caches.delete(k);
+        })).then(() => isUpdate);
+      })
+      .then(isUpdate => self.clients.claim().then(() => isUpdate))
+      .then(isUpdate => {
+        // Only notify clients if this is a genuine update (old caches existed)
+        if (!isUpdate) return;
         self.clients.matchAll({ type: 'window' }).then(clients => {
           clients.forEach(client => client.postMessage({ type: 'SW_UPDATED', version: APP_VERSION }));
         });
