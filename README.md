@@ -1,37 +1,83 @@
-R-IDE: Professional R Programming & Compiler for Android
-R-IDE is a high-performance, mobile-optimized Integrated Development Environment (IDE) designed specifically for the R programming language. Powered by WebR, it allows data scientists, students, and researchers to write, compile, and execute R code directly on Android devices with desktop-grade features.
+# R-IDE
 
-🚀 Key Features
-Full R Compiler: Execute complex R scripts directly in your browser or through the Android app.
+### Professional R Programming & Compiler for Android
 
-Data Visualization: Full support for creating plots and charts using base R and popular libraries.
+**R-IDE** is a high-performance, mobile-optimized **Integrated Development Environment (IDE)** designed specifically for the **R programming language**. Powered by **WebR**, it enables users to write, compile, and execute R code directly on Android devices.
 
-Offline Functionality: Once loaded, the PWA works completely offline, making it perfect for coding on the go.
+Built for **data scientists, students, and researchers**, R-IDE provides a lightweight yet powerful environment for running R scripts and performing data analysis on mobile devices.
 
-Package Management: Install and manage R packages to extend your environment's capabilities.
+---
 
-Linux-Friendly Workflow: Designed with a clean interface that fits perfectly into advanced terminal-based workflows.
+# 🚀 Key Features
 
-📥 Installation
-Option 1: Android App (Recommended)
-Go to the  section of this repository.
+## Full R Compiler
 
-Download the latest .apk file.
+Execute complex **R scripts directly inside the application** using WebR's WebAssembly-based runtime. No external setup or server is required.
 
-Open the file on your Android device and follow the prompts to install.
+## Data Visualization
 
-Option 2: Progressive Web App (PWA)
-Visit .
+Create **plots and charts** using:
 
-Open your browser menu (three dots) and select "Install App" or "Add to Home Screen".
+* Base R plotting functions
+* Supported visualization libraries
+* Interactive data exploration workflows
 
-🛠 Tech Stack
-Core: WebR (WebAssembly-based R distribution)
+## Offline Functionality
 
-Frontend: Optimized PWA architecture
+R-IDE is built as a **Progressive Web App (PWA)**. Once loaded, it can **run completely offline**, allowing users to code and experiment without internet access.
 
-Automation: Built and deployed via GitHub Actions
+## Package Management
 
-Developed with a specialized focus on mobile data science and Android system customization.
+Install and manage **R packages** to extend the functionality of your development environment.
 
-Note: This project and its documentation were developed with the assistance of AI.
+## Mobile-Optimized Interface
+
+A **clean and minimal interface** optimized for Android devices, providing a smooth coding experience even on smaller screens.
+
+---
+
+# 📥 Installation
+
+## Option 1 — Android Application
+
+1. Go to the **Releases** section of this repository.
+2. Download the latest **`.apk` file**.
+3. Open the file on your Android device.
+4. Follow the installation instructions.
+
+> You may need to enable **Install from Unknown Sources** in your Android settings.
+
+---
+
+## Option 2 — Progressive Web App (PWA)
+
+1. Open the web version of the project in your browser.
+2. Tap the browser menu (⋮).
+3. Select **“Install App”** or **“Add to Home Screen”**.
+
+The application will then behave like a **native app** and can run offline after the initial load.
+
+---
+
+# 🛠 Tech Stack
+
+| Component    | Technology                                  |
+| ------------ | ------------------------------------------- |
+| Core Runtime | **WebR** (WebAssembly-based R distribution) |
+| Architecture | **Progressive Web App (PWA)**               |
+| Automation   | **GitHub Actions**                          |
+| Interface    | Mobile-optimized development environment    |
+
+---
+
+# 📌 About This Project
+
+R-IDE was created to make **R programming accessible on Android devices**, providing a portable development environment for data analysis and experimentation.
+
+The project focuses on **simplicity, portability, and performance**, enabling users to run R code without requiring a traditional desktop setup.
+
+---
+
+# ⚠️ Note
+
+This project and its documentation were developed with the assistance of **AI tools**.
