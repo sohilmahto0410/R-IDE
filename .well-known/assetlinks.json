@@ -3,6 +3,7 @@
       "target": {
         "namespace": "android_app",
         "package_name": "io.github.sohilmahto0410.twa",
-        "sha256_cert_fingerprints": ["22:CF:FB:A7:2D:45:A1:F3:3D:A9:08:A5:36:DC:79:29:46:31:BB:C1:AC:2D:93:D5:F7:81:6F:A3:CF:6C:21:9F"]
+        "sha256_cert_fingerprints": ["87:45:DC:D4:AD:46:41:AE:DE:45:FC:EB:5D:6F:20:21:24:C1:41:C5:79:86:AD:B4:52:A8:DF:A2:1A:8B:E6:3C"]
       }
     }]
+
