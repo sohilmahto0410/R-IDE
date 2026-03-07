@@ -5,7 +5,7 @@
    automatically on next visit (after one background refresh cycle).
 */
 
-const APP_VERSION = '1.0.0'; // ← bump this on every release
+const APP_VERSION = '1.0.1'; // ← bump this on every release
 const CACHE_NAME  = `ride-${APP_VERSION}`;
 
 const SHELL_FILES = [
