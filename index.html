@@ -40,21 +40,40 @@ body{height:100%;overflow:hidden;background:#141218;color:var(--on-s);
 /* ── LOADING ── */
 #lo{position:fixed;inset:0;background:var(--bg);z-index:9999;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
-  transition:opacity .4s var(--smooth)}
+  transition:opacity .5s var(--smooth)}
 #lo.gone{opacity:0;pointer-events:none}
-.lo-icon{width:72px;height:72px;border-radius:24px;
-  background:linear-gradient(135deg,var(--pri-con),#7C3AED);
+/* Splash icon — matches reference: large rounded square, purple gradient, white R */
+.lo-icon{
+  width:108px;height:108px;border-radius:28px;
+  background:linear-gradient(145deg,#6D3FC8 0%,#4F278B 60%,#3B1F6E 100%);
   display:flex;align-items:center;justify-content:center;
-  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:32px;color:#fff;
-  box-shadow:0 8px 32px rgba(208,188,255,.35);
-  animation:loFlt 2s ease-in-out infinite}
-@keyframes loFlt{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-8px) rotate(-2deg)}}
-.lo-title{font-family:'Google Sans Display',sans-serif;font-size:22px;font-weight:700}
+  font-family:'JetBrains Mono',monospace;font-weight:800;font-size:54px;color:#fff;
+  box-shadow:0 16px 48px rgba(79,39,139,.55), 0 4px 16px rgba(0,0,0,.4);
+  animation:loEntrance .6s var(--spring) forwards, loBreath 3s ease-in-out 0.6s infinite;
+  letter-spacing:-2px;
+}
+@keyframes loEntrance{
+  0%  {transform:scale(0.4) translateY(30px);opacity:0}
+  70% {transform:scale(1.08) translateY(-4px);opacity:1}
+  100%{transform:scale(1) translateY(0);opacity:1}
+}
+@keyframes loBreath{
+  0%,100%{transform:scale(1);box-shadow:0 16px 48px rgba(79,39,139,.55),0 4px 16px rgba(0,0,0,.4)}
+  50%    {transform:scale(1.04);box-shadow:0 20px 56px rgba(79,39,139,.7),0 6px 20px rgba(0,0,0,.4)}
+}
+.lo-title{font-family:'Google Sans Display',sans-serif;font-size:24px;font-weight:700;
+  animation:loFadeUp .5s var(--smooth) .3s both}
 .lo-sub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--on-sv);
-  text-align:center;line-height:1.6;max-width:280px}
-.lo-track{width:220px;height:4px;background:var(--s4);border-radius:2px;overflow:hidden}
+  text-align:center;line-height:1.6;max-width:280px;
+  animation:loFadeUp .5s var(--smooth) .45s both}
+.lo-track{width:220px;height:4px;background:var(--s4);border-radius:2px;overflow:hidden;
+  animation:loFadeUp .5s var(--smooth) .5s both}
 .lo-fill{height:100%;background:linear-gradient(90deg,var(--pri-con),var(--pri));
   width:0%;border-radius:2px;transition:width .5s var(--smooth)}
+@keyframes loFadeUp{
+  from{opacity:0;transform:translateY(12px)}
+  to  {opacity:1;transform:translateY(0)}
+}
 
 /* ── OTA UPDATE TOAST ── */
 #ota-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);
@@ -247,10 +266,10 @@ body{height:100%;overflow:hidden;background:#141218;color:var(--on-s);
 #plot-view{flex:1;overflow:auto;display:flex;padding:16px;background:var(--s1);
   -webkit-overflow-scrolling:touch;align-items:flex-start;justify-content:center}
 #plot-wrap{display:none;background:white;border-radius:var(--r-lg);overflow:hidden;
-  box-shadow:0 8px 32px rgba(0,0,0,.5);flex-shrink:0;max-width:100%;
-  animation:pltIn .35s var(--spring)}
+  box-shadow:0 8px 32px rgba(0,0,0,.5);flex-shrink:0;
+  animation:pltIn .35s var(--spring);transform-origin:top center}
 @keyframes pltIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
-#plot-wrap img{display:block;width:100%;height:auto;max-width:none}
+#plot-wrap img{display:block;width:100%;height:auto}
 
 /* ── FILES ── */
 #fdrop{margin:12px;border:2px dashed var(--outv);border-radius:var(--r-xl);
@@ -738,6 +757,8 @@ async function boot() {
     setSt('s-ok', 'Ready');
     log('✓ R is running via WebR!', 'ok');
     log('ℹ Ctrl+Enter or ▶ Run to execute.  Plots → Plots tab.', 'inf');
+    // Sync actually-installed packages from R environment (catches pre-installed ones)
+    await syncInstalledPkgs();
     renderPkgs('');
     updateLnums();
 
@@ -907,7 +928,6 @@ function renderPlotTabs() {
 function showPlot(idx) {
   if (idx < 0 || idx >= plots.length) return;
   activePlot = idx;
-  // Reset zoom to 100% natural size when switching plots
   plotZoom = 1;
   $('zoom-val').textContent = '100%';
 
@@ -917,14 +937,19 @@ function showPlot(idx) {
   wrap.style.animation = 'none';
   void wrap.offsetWidth;
   wrap.style.animation = '';
+
+  // Reset transform — CSS handles initial fit
+  wrap.style.transform = 'scale(1)';
+  wrap.style.transformOrigin = 'top center';
+  wrap.style.width = '';
+  wrap.style.marginLeft = '';
+  wrap.style.marginRight = '';
+  $('plot-view').style.justifyContent = 'center';
+  $('plot-view').style.alignItems = 'flex-start';
+
   const pi = $('plot-img');
-  // Reset everything — CSS handles fit-to-width at zoom=1
   pi.style.width = '100%';
   pi.style.height = 'auto';
-  pi.style.maxWidth = 'none';
-  wrap.style.width = '';
-  wrap.style.height = '';
-  $('plot-view').style.justifyContent = 'center';
   pi.src = plots[idx].src;
   renderPlotTabs();
 }
@@ -962,36 +987,31 @@ window.savePlot = function() {
   a.click();
 };
 
-// ── Zoom: at 100% fit to container width; above that expand to natural size × factor
+// ── Zoom: use CSS transform:scale for perfectly consistent zoom behaviour
+// Scale 1 = fit-to-width (matches initial render exactly). Zoom in/out scales from there.
 window.zoomPlot = function(factor) {
-  plotZoom = Math.max(0.5, Math.min(5, plotZoom * factor));
+  plotZoom = Math.max(0.25, Math.min(5, plotZoom * factor));
   $('zoom-val').textContent = Math.round(plotZoom * 100) + '%';
 
   const wrap = $('plot-wrap');
   const view = $('plot-view');
-  const img  = $('plot-img');
-  const viewW = view.clientWidth - 32; // subtract padding
 
-  function apply() {
-    const nat = img.naturalWidth || viewW;
-    const scaled = Math.round(nat * plotZoom);
-    if (scaled <= viewW) {
-      // Fits inside — centre it, no overflow
-      img.style.width    = '100%';
-      img.style.maxWidth = scaled + 'px';
-      wrap.style.width   = '';
-      view.style.justifyContent = 'center';
-    } else {
-      // Larger than view — allow scroll
-      img.style.width    = scaled + 'px';
-      img.style.maxWidth = 'none';
-      wrap.style.width   = scaled + 'px';
-      view.style.justifyContent = 'flex-start';
-    }
-    img.style.height = 'auto';
-    wrap.style.height = '';
+  // Apply scale transform — origin is top-center so it grows downward
+  wrap.style.transform = `scale(${plotZoom})`;
+  wrap.style.transformOrigin = 'top center';
+
+  // When zoomed in, adjust view alignment so scrolling works correctly
+  if (plotZoom > 1) {
+    view.style.justifyContent = 'center';
+    view.style.alignItems = 'flex-start';
+    // Give the view enough scroll height by setting a margin based on scale
+    const scaledH = wrap.offsetHeight * plotZoom;
+    wrap.style.marginBottom = Math.max(0, scaledH - wrap.offsetHeight) + 'px';
+  } else {
+    view.style.justifyContent = 'center';
+    view.style.alignItems = 'flex-start';
+    wrap.style.marginBottom = '';
   }
-  if (img.complete && img.naturalWidth) { apply(); } else { img.onload = apply; }
 };
 
 // ══════════════════════════════════════════════
@@ -1122,14 +1142,39 @@ const PKGS = [
   {n:'data.table',d:'Fast data manipulation'},{n:'Rcpp',d:'R + C++ integration'},
   {n:'reshape2',d:'Reshape data frames'},{n:'zoo',d:'Time series'},
 ];
+// Sync installedPkgs from R's actual installed.packages() — catches packages
+// installed outside the PKGS list (e.g. readxl, janitor, etc.)
+window.syncInstalledPkgs = async function() {
+  if (!ready) return;
+  try {
+    const res = await webR.evalR('rownames(installed.packages())');
+    const arr = await res.toArray();
+    res.destroy?.();
+    arr.forEach(n => installedPkgs.add(n));
+  } catch(_) {}
+};
+
 window.renderPkgs = function(f = '') {
   const el = $('plist'); el.innerHTML = '';
   const filter = f.toLowerCase();
-  const show = f ? PKGS.filter(p => p.n.toLowerCase().includes(filter)) : PKGS;
-  if (!show.length) { el.innerHTML = '<div style="padding:14px;font-size:12px;color:var(--out)">Type a name & press Install.</div>'; return; }
 
-  const installed = show.filter(p => installedPkgs.has(p.n));
-  const available = show.filter(p => !installedPkgs.has(p.n));
+  // Build a merged list: PKGS known list + any extra installed packages
+  const pkgMap = new Map(PKGS.map(p => [p.n, p]));
+  // Add installed packages not in PKGS list as unknown entries
+  installedPkgs.forEach(n => {
+    if (!pkgMap.has(n)) pkgMap.set(n, { n, d: 'Installed package' });
+  });
+  const allPkgs = [...pkgMap.values()];
+
+  const filtered = filter ? allPkgs.filter(p => p.n.toLowerCase().includes(filter)) : allPkgs;
+
+  if (!filtered.length) {
+    el.innerHTML = '<div style="padding:14px;font-size:12px;color:var(--out)">Type a name & press Install.</div>';
+    return;
+  }
+
+  const installed = filtered.filter(p => installedPkgs.has(p.n));
+  const available = filtered.filter(p => !installedPkgs.has(p.n));
 
   function makeRow(p) {
     const isLoaded = loadedPkgs.has(p.n);
@@ -1144,7 +1189,7 @@ window.renderPkgs = function(f = '') {
 
   if (installed.length) {
     const sec = document.createElement('div'); sec.className = 'pkg-section';
-    sec.textContent = 'Installed'; el.appendChild(sec);
+    sec.textContent = `Installed (${installed.length})`; el.appendChild(sec);
     installed.forEach(makeRow);
   }
   if (available.length) {
@@ -1818,6 +1863,10 @@ window.goTab = function(t) {
   $('P-'+t).classList.add('on');
   $('T-'+t).classList.add('on');
   if (t === 'plots') $('T-plots').classList.remove('has-badge');
+  // Re-sync installed packages from R every time packages tab is opened
+  if (t === 'packages' && ready) {
+    syncInstalledPkgs().then(() => renderPkgs($('pin').value));
+  }
 };
 
 // ── Reset session
