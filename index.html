@@ -681,20 +681,22 @@ function bootError(msg) {
 
 // ── Boot
 async function boot() {
-  // Check SharedArrayBuffer availability (needs coi-serviceworker.js to inject COOP/COEP)
-  if (typeof SharedArrayBuffer === 'undefined') {
+  // In TWA/standalone mode, SharedArrayBuffer is available natively — skip COI checks
+  const isStandalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.matchMedia('(display-mode: fullscreen)').matches;
+
+  // Check SharedArrayBuffer (only needed in browser tab, not TWA)
+  if (typeof SharedArrayBuffer === 'undefined' && !isStandalone) {
     if ('serviceWorker' in navigator) {
-      // COI SW may have just installed — if it's active, one reload gives us isolation
       const reg = await navigator.serviceWorker.getRegistration('./coi-serviceworker.js');
       if (reg && (reg.active || reg.installing || reg.waiting)) {
         console.log('[R-IDE] COI SW found, reloading for cross-origin isolation…');
         location.reload();
         return;
       }
-      // Not installed yet — register it; coi-serviceworker.js will auto-reload on activation
       try {
         await navigator.serviceWorker.register('./coi-serviceworker.js');
-        // The SW's own logic will call location.reload() once active
         return;
       } catch(e) {
         bootError('⚠ <b>SharedArrayBuffer unavailable</b><br><br>' +

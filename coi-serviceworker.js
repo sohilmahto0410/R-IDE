@@ -26,7 +26,21 @@
   }
 
   // ── Running in the page ──
-  // If already isolated, nothing to do
+
+  // Skip COI entirely in TWA/standalone mode — TWA is a native Chrome wrapper,
+  // it handles SharedArrayBuffer natively without needing COOP/COEP header injection.
+  // Triggering location.reload() in TWA causes a visible flash/reload on every launch.
+  const isStandalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.matchMedia('(display-mode: fullscreen)').matches ||
+    window.navigator.standalone === true; // iOS Safari PWA
+
+  if (isStandalone) {
+    console.log('[coi] Standalone/TWA mode — skipping COI reload');
+    return;
+  }
+
+  // If already isolated (browser tab with headers), nothing to do
   if (self.crossOriginIsolated) return;
 
   if (!('serviceWorker' in navigator)) {
@@ -45,7 +59,7 @@
           }
         });
       });
-      // Already active but page isn't controlled yet → reload once
+      // Already active but page not yet controlled → reload once to get isolation
       if (reg.active && !navigator.serviceWorker.controller) {
         location.reload();
       }
