@@ -681,13 +681,33 @@ function bootError(msg) {
 
 // ── Boot
 async function boot() {
-  // Check SharedArrayBuffer availability (requires COOP+COEP headers)
+  // Check SharedArrayBuffer availability (needs coi-serviceworker.js to inject COOP/COEP)
   if (typeof SharedArrayBuffer === 'undefined') {
+    if ('serviceWorker' in navigator) {
+      // COI SW may have just installed — if it's active, one reload gives us isolation
+      const reg = await navigator.serviceWorker.getRegistration('./coi-serviceworker.js');
+      if (reg && (reg.active || reg.installing || reg.waiting)) {
+        console.log('[R-IDE] COI SW found, reloading for cross-origin isolation…');
+        location.reload();
+        return;
+      }
+      // Not installed yet — register it; coi-serviceworker.js will auto-reload on activation
+      try {
+        await navigator.serviceWorker.register('./coi-serviceworker.js');
+        // The SW's own logic will call location.reload() once active
+        return;
+      } catch(e) {
+        bootError('⚠ <b>SharedArrayBuffer unavailable</b><br><br>' +
+          'Failed to register coi-serviceworker.js.<br>' +
+          'Make sure the file is in your GitHub repo root.<br><br>' +
+          '<b>Error:</b> ' + e.message);
+        return;
+      }
+    }
     bootError(
       '⚠ <b>SharedArrayBuffer unavailable</b><br><br>' +
-      'This page is missing Cross-Origin Isolation headers.<br>' +
-      'If you just deployed, wait 1–2 min and retry.<br><br>' +
-      '<b>Netlify fix:</b> ensure <code>_headers</code> file is in your deploy folder.<br>' +
+      'Your browser does not support Service Workers.<br>' +
+      'Please use Chrome or Firefox.<br><br>' +
       '<b>crossOriginIsolated:</b> ' + self.crossOriginIsolated
     );
     return;
