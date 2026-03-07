@@ -2,7 +2,7 @@
       "relation": ["delegate_permission/common.handle_all_urls"],
       "target": {
         "namespace": "android_app",
-        "package_name": "app.netlify.rideonline.twa",
-        "sha256_cert_fingerprints": ["01:A8:34:43:13:4E:60:33:3B:6D:2B:48:48:C8:08:18:BE:E9:1C:1B:6C:EC:77:1E:60:A9:F8:3E:86:E7:A1:39"]
+        "package_name": "io.github.sohilmahto0410.twa",
+        "sha256_cert_fingerprints": ["22:CF:FB:A7:2D:45:A1:F3:3D:A9:08:A5:36:DC:79:29:46:31:BB:C1:AC:2D:93:D5:F7:81:6F:A3:CF:6C:21:9F"]
       }
     }]
