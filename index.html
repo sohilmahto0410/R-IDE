@@ -237,8 +237,17 @@ body{height:100%;overflow:hidden;background:#141218;color:var(--on-s);
 /* ── PLOT LIGHTBOX ── */
 #plot-lb{position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.88);
   backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  display:none;overflow:hidden;touch-action:none}
+  display:none;overflow:hidden;touch-action:none;
+  opacity:0;transition:opacity .28s cubic-bezier(.4,0,.2,1)}
 #plot-lb.open{display:block}
+#plot-lb.lb-in{opacity:1}
+#plot-lb.lb-out{opacity:0}
+@keyframes lbCardIn{
+  from{opacity:0;transform:scale(0.82) translateY(28px)}
+  to  {opacity:1;transform:scale(1)    translateY(0)}}
+@keyframes lbCardOut{
+  from{opacity:1;transform:scale(1)    translateY(0)}
+  to  {opacity:0;transform:scale(0.82) translateY(28px)}}
 /* white card — gives the plot its white background in the lightbox */
 #plot-lb-card{position:absolute;background:#ffffff;border-radius:12px;overflow:hidden;
   box-shadow:0 24px 80px rgba(0,0,0,.7);cursor:grab;will-change:left,top;
@@ -1011,7 +1020,13 @@ window.openPlotLb = function(src) {
   const overlay = $('plot-lb');
   const card    = $('plot-lb-card');
   const img     = card.querySelector('img');
-  overlay.classList.add('open');
+  // Reset animation state
+  overlay.classList.remove('lb-out');
+  card.style.animation = 'none';
+  overlay.style.display = 'block';
+  // Force reflow then fade overlay in
+  void overlay.offsetWidth;
+  overlay.classList.add('open', 'lb-in');
   $('plot-lb-pct').textContent = '100%';
   $('plot-lb-hint').textContent = window.innerWidth < 768
     ? 'Pinch to zoom  ·  Drag to pan  ·  Tap ✕ to close'
@@ -1022,9 +1037,13 @@ window.openPlotLb = function(src) {
     LB.w = Math.round(img.naturalWidth  * s);
     LB.h = Math.round(img.naturalHeight * s);
     LB.scale = 1;
-    LB.cx = (vw - LB.w) / 2;   // center horizontally
-    LB.cy = (vh - LB.h) / 2;   // center vertically
+    LB.cx = (vw - LB.w) / 2;
+    LB.cy = (vh - LB.h) / 2;
     lbRender();
+    // Animate card in after position is set
+    card.style.animation = 'none';
+    void card.offsetWidth;
+    card.style.animation = 'lbCardIn .32s cubic-bezier(.34,1.56,.64,1) forwards';
   };
   img.src = ''; img.src = src;
   document._lbEsc = e => { if (e.key === 'Escape') closePlotLb(); };
@@ -1033,8 +1052,20 @@ window.openPlotLb = function(src) {
 
 window.closePlotLb = function() {
   LB.open = false; LB.ptrs = {};
-  $('plot-lb').classList.remove('open');
   document.removeEventListener('keydown', document._lbEsc);
+  const overlay = $('plot-lb');
+  const card    = $('plot-lb-card');
+  // Card exit animation
+  card.style.animation = 'lbCardOut .22s cubic-bezier(.4,0,.2,1) forwards';
+  // Overlay fade out
+  overlay.classList.remove('lb-in');
+  overlay.classList.add('lb-out');
+  overlay.addEventListener('transitionend', function hide() {
+    overlay.classList.remove('open', 'lb-out');
+    overlay.style.display = 'none';
+    card.style.animation = 'none';
+    overlay.removeEventListener('transitionend', hide);
+  }, { once: true });
 };
 
 // Button zoom toward screen center
