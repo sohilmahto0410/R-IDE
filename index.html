@@ -148,7 +148,7 @@ body{height:100%;overflow:hidden;background:#141218;color:var(--on-s);
   overflow:hidden;flex-shrink:0;position:relative;user-select:none}
 #lnums{position:absolute;top:0;right:0;
   padding:14px 4px 200px 2px;
-  font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.7;
+  font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.7;
   color:var(--lnum-fg);text-align:right;white-space:pre;pointer-events:none;
   will-change:transform}
 .lnum-active{color:var(--pri);font-weight:500}
@@ -245,18 +245,12 @@ body{height:100%;overflow:hidden;background:#141218;color:var(--on-s);
 .pe-icon{font-size:52px;opacity:.22}
 /* scrollable view for zoomed plots */
 #plot-view{flex:1;overflow:auto;display:flex;padding:16px;background:var(--s1);
-  -webkit-overflow-scrolling:touch;align-items:flex-start;justify-content:center}
+  -webkit-overflow-scrolling:touch;align-items:center;justify-content:center}
 #plot-wrap{display:none;background:white;border-radius:var(--r-lg);overflow:hidden;
-  box-shadow:0 8px 32px rgba(0,0,0,.5);flex-shrink:0;max-width:100%;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);flex-shrink:0;
   animation:pltIn .35s var(--spring)}
 @keyframes pltIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
 #plot-wrap img{display:block;width:100%;height:auto}
-/* Desktop: contain plot fully within view — no overflow at 100% zoom */
-@media(min-width:768px){
-  #plot-view{align-items:center}
-  #plot-wrap.desktop-fit{width:auto;max-width:100%;max-height:100%}
-  #plot-wrap.desktop-fit img{width:auto;max-width:100%;max-height:100%;height:auto}
-}
 
 /* ── FILES ── */
 #fdrop{margin:12px;border:2px dashed var(--outv);border-radius:var(--r-xl);
@@ -912,6 +906,31 @@ function renderPlotTabs() {
 
 function isDesktop() { return window.innerWidth >= 768; }
 
+function applyPlotFit(wrap, img, view) {
+  const availW = view.clientWidth  - 32;
+  const availH = view.clientHeight - 32;
+  const natW   = img.naturalWidth;
+  const natH   = img.naturalHeight;
+  if (!natW || !natH) return;
+
+  if (isDesktop()) {
+    // Fit entire plot within visible area — no overflow, no scrolling at 100%
+    const scale = Math.min(availW / natW, availH / natH, 1);
+    const fitW  = Math.floor(natW * scale);
+    const fitH  = Math.floor(natH * scale);
+    wrap.style.width  = fitW + 'px';
+    wrap.style.height = fitH + 'px';
+    img.style.width   = '100%';
+    img.style.height  = '100%';
+  } else {
+    // Mobile: fill width, natural aspect ratio height
+    wrap.style.width  = '100%';
+    wrap.style.height = '';
+    img.style.width   = '100%';
+    img.style.height  = 'auto';
+  }
+}
+
 function showPlot(idx) {
   if (idx < 0 || idx >= plots.length) return;
   activePlot = idx;
@@ -920,31 +939,19 @@ function showPlot(idx) {
 
   $('plot-empty').style.display = 'none';
   const wrap = $('plot-wrap');
+  const view = $('plot-view');
   wrap.style.display = 'block';
   wrap.style.animation = 'none';
   void wrap.offsetWidth;
   wrap.style.animation = '';
 
-  // Reset inline styles
-  wrap.style.width = '';
-  wrap.style.maxWidth = '';
-  wrap.style.maxHeight = '';
   const pi = $('plot-img');
-  pi.style.width = '';
-  pi.style.maxWidth = '';
-  pi.style.maxHeight = '';
-  pi.style.height = 'auto';
+  pi.style.width  = '';
+  pi.style.height = '';
+  wrap.style.width  = '';
+  wrap.style.height = '';
 
-  if (isDesktop()) {
-    // Desktop: CSS media query handles contain via .desktop-fit class
-    wrap.classList.add('desktop-fit');
-  } else {
-    // Mobile: fill width, scroll vertically if needed
-    wrap.classList.remove('desktop-fit');
-    wrap.style.width = '100%';
-    pi.style.width = '100%';
-  }
-
+  pi.onload = () => applyPlotFit(wrap, pi, view);
   pi.src = plots[idx].src;
   renderPlotTabs();
 }
@@ -982,7 +989,7 @@ window.savePlot = function() {
   a.click();
 };
 
-// ── Zoom: 100% = fit-to-container. Zoom in expands beyond, enabling scroll.
+// ── Zoom: at 100% fit to container width; above that expand to natural size × factor
 window.zoomPlot = function(factor) {
   plotZoom = Math.max(0.25, Math.min(5, plotZoom * factor));
   $('zoom-val').textContent = Math.round(plotZoom * 100) + '%';
@@ -993,33 +1000,16 @@ window.zoomPlot = function(factor) {
 
   function apply() {
     if (plotZoom <= 1) {
-      // Back to fit-to-container — restore default state
-      wrap.style.width = '';
-      wrap.style.maxWidth = '';
-      wrap.style.maxHeight = '';
-      img.style.width = '';
-      img.style.maxWidth = '';
-      img.style.maxHeight = '';
-      img.style.height = 'auto';
-      if (isDesktop()) {
-        wrap.classList.add('desktop-fit');
-      } else {
-        wrap.classList.remove('desktop-fit');
-        wrap.style.width = '100%';
-        img.style.width = '100%';
-      }
+      // Restore fit-to-view
+      applyPlotFit(wrap, img, view);
     } else {
-      // Zoomed in — expand beyond container, allow scroll
-      wrap.classList.remove('desktop-fit');
-      const nat = img.naturalWidth || (view.clientWidth - 32);
-      const scaled = Math.round(nat * plotZoom);
-      wrap.style.width = scaled + 'px';
-      wrap.style.maxWidth = 'none';
-      wrap.style.maxHeight = 'none';
-      img.style.width = '100%';
-      img.style.maxWidth = 'none';
-      img.style.maxHeight = 'none';
-      img.style.height = 'auto';
+      // Expand beyond natural size × zoom factor — scroll to explore
+      const scaledW = Math.round(img.naturalWidth  * plotZoom);
+      const scaledH = Math.round(img.naturalHeight * plotZoom);
+      wrap.style.width  = scaledW + 'px';
+      wrap.style.height = scaledH + 'px';
+      img.style.width   = '100%';
+      img.style.height  = '100%';
     }
   }
   if (img.complete && img.naturalWidth) { apply(); } else { img.onload = apply; }
