@@ -148,7 +148,7 @@ body{height:100%;overflow:hidden;background:#141218;color:var(--on-s);
   overflow:hidden;flex-shrink:0;position:relative;user-select:none}
 #lnums{position:absolute;top:0;right:0;
   padding:14px 4px 200px 2px;
-  font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.7;
+  font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.7;
   color:var(--lnum-fg);text-align:right;white-space:pre;pointer-events:none;
   will-change:transform}
 .lnum-active{color:var(--pri);font-weight:500}
@@ -245,14 +245,18 @@ body{height:100%;overflow:hidden;background:#141218;color:var(--on-s);
 .pe-icon{font-size:52px;opacity:.22}
 /* scrollable view for zoomed plots */
 #plot-view{flex:1;overflow:auto;display:flex;padding:16px;background:var(--s1);
-  -webkit-overflow-scrolling:touch;align-items:flex-start;justify-content:center;
-  box-sizing:border-box}
+  -webkit-overflow-scrolling:touch;align-items:flex-start;justify-content:center}
 #plot-wrap{display:none;background:white;border-radius:var(--r-lg);overflow:hidden;
-  box-shadow:0 8px 32px rgba(0,0,0,.5);flex-shrink:0;
-  width:100%;max-width:100%;transform-origin:top center;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);flex-shrink:0;max-width:100%;
   animation:pltIn .35s var(--spring)}
 @keyframes pltIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
 #plot-wrap img{display:block;width:100%;height:auto}
+/* Desktop: contain plot fully within view — no overflow at 100% zoom */
+@media(min-width:768px){
+  #plot-view{align-items:center}
+  #plot-wrap.desktop-fit{width:auto;max-width:100%;max-height:100%}
+  #plot-wrap.desktop-fit img{width:auto;max-width:100%;max-height:100%;height:auto}
+}
 
 /* ── FILES ── */
 #fdrop{margin:12px;border:2px dashed var(--outv);border-radius:var(--r-xl);
@@ -906,6 +910,8 @@ function renderPlotTabs() {
   $('pcnt').textContent = plots.length + ' plot' + (plots.length !== 1 ? 's' : '');
 }
 
+function isDesktop() { return window.innerWidth >= 768; }
+
 function showPlot(idx) {
   if (idx < 0 || idx >= plots.length) return;
   activePlot = idx;
@@ -919,16 +925,26 @@ function showPlot(idx) {
   void wrap.offsetWidth;
   wrap.style.animation = '';
 
-  // Always fit to container width at 100% — no overflow ever at default zoom
-  wrap.style.transform = '';
-  wrap.style.width = '100%';
-  wrap.style.maxWidth = '100%';
-  wrap.style.marginLeft = '';
-  wrap.style.marginRight = '';
-
+  // Reset inline styles
+  wrap.style.width = '';
+  wrap.style.maxWidth = '';
+  wrap.style.maxHeight = '';
   const pi = $('plot-img');
-  pi.style.width = '100%';
+  pi.style.width = '';
+  pi.style.maxWidth = '';
+  pi.style.maxHeight = '';
   pi.style.height = 'auto';
+
+  if (isDesktop()) {
+    // Desktop: CSS media query handles contain via .desktop-fit class
+    wrap.classList.add('desktop-fit');
+  } else {
+    // Mobile: fill width, scroll vertically if needed
+    wrap.classList.remove('desktop-fit');
+    wrap.style.width = '100%';
+    pi.style.width = '100%';
+  }
+
   pi.src = plots[idx].src;
   renderPlotTabs();
 }
@@ -966,32 +982,47 @@ window.savePlot = function() {
   a.click();
 };
 
-// ── Zoom: 100% = fit-to-container (no overflow). + zooms in beyond that.
+// ── Zoom: 100% = fit-to-container. Zoom in expands beyond, enabling scroll.
 window.zoomPlot = function(factor) {
   plotZoom = Math.max(0.25, Math.min(5, plotZoom * factor));
   $('zoom-val').textContent = Math.round(plotZoom * 100) + '%';
 
   const wrap = $('plot-wrap');
   const view = $('plot-view');
-  // Available width inside the padded view
-  const availW = view.clientWidth - 32;
+  const img  = $('plot-img');
 
-  if (plotZoom <= 1) {
-    // Fit to container — no scroll needed
-    wrap.style.transform = '';
-    wrap.style.width = '100%';
-    wrap.style.maxWidth = '100%';
-    wrap.style.marginLeft = '';
-    wrap.style.marginRight = '';
-  } else {
-    // Expand beyond container width — use pixel width so view can scroll
-    const expandedW = Math.round(availW * plotZoom);
-    wrap.style.transform = '';
-    wrap.style.width = expandedW + 'px';
-    wrap.style.maxWidth = 'none';
-    wrap.style.marginLeft = '';
-    wrap.style.marginRight = '';
+  function apply() {
+    if (plotZoom <= 1) {
+      // Back to fit-to-container — restore default state
+      wrap.style.width = '';
+      wrap.style.maxWidth = '';
+      wrap.style.maxHeight = '';
+      img.style.width = '';
+      img.style.maxWidth = '';
+      img.style.maxHeight = '';
+      img.style.height = 'auto';
+      if (isDesktop()) {
+        wrap.classList.add('desktop-fit');
+      } else {
+        wrap.classList.remove('desktop-fit');
+        wrap.style.width = '100%';
+        img.style.width = '100%';
+      }
+    } else {
+      // Zoomed in — expand beyond container, allow scroll
+      wrap.classList.remove('desktop-fit');
+      const nat = img.naturalWidth || (view.clientWidth - 32);
+      const scaled = Math.round(nat * plotZoom);
+      wrap.style.width = scaled + 'px';
+      wrap.style.maxWidth = 'none';
+      wrap.style.maxHeight = 'none';
+      img.style.width = '100%';
+      img.style.maxWidth = 'none';
+      img.style.maxHeight = 'none';
+      img.style.height = 'auto';
+    }
   }
+  if (img.complete && img.naturalWidth) { apply(); } else { img.onload = apply; }
 };
 
 // ══════════════════════════════════════════════
