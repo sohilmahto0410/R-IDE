@@ -245,12 +245,42 @@ body{height:100%;overflow:hidden;background:#141218;color:var(--on-s);
 .pe-icon{font-size:52px;opacity:.22}
 /* scrollable view for zoomed plots */
 #plot-view{flex:1;overflow:auto;display:flex;padding:16px;background:var(--s1);
-  -webkit-overflow-scrolling:touch;align-items:center;justify-content:center}
+  -webkit-overflow-scrolling:touch;align-items:flex-start;justify-content:center}
 #plot-wrap{display:none;background:white;border-radius:var(--r-lg);overflow:hidden;
-  box-shadow:0 8px 32px rgba(0,0,0,.5);flex-shrink:0;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);flex-shrink:0;max-width:100%;
   animation:pltIn .35s var(--spring)}
 @keyframes pltIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
-#plot-wrap img{display:block;width:100%;height:auto}
+#plot-wrap img{display:block;width:100%;height:auto;max-width:none;cursor:zoom-in}
+
+/* ── PLOT LIGHTBOX ── */
+#plot-lb{position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,.88);
+  display:none;align-items:center;justify-content:center;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#plot-lb.open{display:flex}
+#plot-lb-inner{position:relative;cursor:grab;user-select:none;touch-action:none}
+#plot-lb-inner.grabbing{cursor:grabbing}
+#plot-lb-img{display:block;border-radius:12px;
+  box-shadow:0 24px 80px rgba(0,0,0,.8);pointer-events:none;
+  transform-origin:0 0}
+#plot-lb-close{position:fixed;top:16px;right:16px;width:40px;height:40px;
+  border-radius:50%;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);
+  color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;z-index:8001;transition:background .15s;backdrop-filter:blur(4px)}
+#plot-lb-close:hover{background:rgba(255,255,255,.22)}
+#plot-lb-zoom{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:10px;background:rgba(30,27,38,.9);
+  border:1px solid rgba(255,255,255,.12);border-radius:24px;padding:8px 16px;
+  z-index:8001;backdrop-filter:blur(8px)}
+#plot-lb-zoom button{width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.2);
+  background:rgba(255,255,255,.1);color:#fff;font-size:16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:background .15s}
+#plot-lb-zoom button:hover{background:rgba(255,255,255,.22)}
+#plot-lb-pct{font-family:'JetBrains Mono',monospace;font-size:12px;color:#fff;min-width:42px;text-align:center}
+#plot-lb-hint{position:fixed;top:16px;left:50%;transform:translateX(-50%);
+  font-size:11px;color:rgba(255,255,255,.5);font-family:'Google Sans',sans-serif;
+  background:rgba(0,0,0,.4);padding:4px 12px;border-radius:12px;pointer-events:none;
+  animation:lbHintFade 3s ease forwards 1.5s}
+@keyframes lbHintFade{to{opacity:0}}
 
 /* ── FILES ── */
 #fdrop{margin:12px;border:2px dashed var(--outv);border-radius:var(--r-xl);
@@ -504,7 +534,7 @@ grid(col = "grey80")
         <div class="sg-t">Editor</div>
         <div class="s-row">
           <div>Font Size</div>
-          <select class="pill-sel" onchange="const s=this.value+'px';document.getElementById('ed').style.fontSize=s;document.getElementById('hl').style.fontSize=s;updateLnums()">
+          <select class="pill-sel" id="font-size-sel" onchange="setEditorFontSize(this.value)">
             <option value="11">11px</option><option value="12">12px</option>
             <option value="13" selected>13px</option><option value="14">14px</option>
             <option value="16">16px</option><option value="18">18px</option>
@@ -904,55 +934,30 @@ function renderPlotTabs() {
   $('pcnt').textContent = plots.length + ' plot' + (plots.length !== 1 ? 's' : '');
 }
 
-function isDesktop() { return window.innerWidth >= 768; }
-
-function applyPlotFit(wrap, img, view) {
-  const availW = view.clientWidth  - 32;
-  const availH = view.clientHeight - 32;
-  const natW   = img.naturalWidth;
-  const natH   = img.naturalHeight;
-  if (!natW || !natH) return;
-
-  if (isDesktop()) {
-    // Fit entire plot within visible area — no overflow, no scrolling at 100%
-    const scale = Math.min(availW / natW, availH / natH, 1);
-    const fitW  = Math.floor(natW * scale);
-    const fitH  = Math.floor(natH * scale);
-    wrap.style.width  = fitW + 'px';
-    wrap.style.height = fitH + 'px';
-    img.style.width   = '100%';
-    img.style.height  = '100%';
-  } else {
-    // Mobile: fill width, natural aspect ratio height
-    wrap.style.width  = '100%';
-    wrap.style.height = '';
-    img.style.width   = '100%';
-    img.style.height  = 'auto';
-  }
-}
-
 function showPlot(idx) {
   if (idx < 0 || idx >= plots.length) return;
   activePlot = idx;
+  // Reset zoom to 100% natural size when switching plots
   plotZoom = 1;
   $('zoom-val').textContent = '100%';
 
   $('plot-empty').style.display = 'none';
   const wrap = $('plot-wrap');
-  const view = $('plot-view');
   wrap.style.display = 'block';
   wrap.style.animation = 'none';
   void wrap.offsetWidth;
   wrap.style.animation = '';
-
   const pi = $('plot-img');
-  pi.style.width  = '';
-  pi.style.height = '';
-  wrap.style.width  = '';
+  // Reset everything — CSS handles fit-to-width at zoom=1
+  pi.style.width = '100%';
+  pi.style.height = 'auto';
+  pi.style.maxWidth = 'none';
+  wrap.style.width = '';
   wrap.style.height = '';
-
-  pi.onload = () => applyPlotFit(wrap, pi, view);
+  $('plot-view').style.justifyContent = 'center';
   pi.src = plots[idx].src;
+  pi.style.cursor = 'zoom-in';
+  pi.onclick = () => openPlotLb(plots[idx].src);
   renderPlotTabs();
 }
 
@@ -989,28 +994,199 @@ window.savePlot = function() {
   a.click();
 };
 
+// ══════════════════════════════════════════════
+// FONT SIZE — keeps line numbers in sync
+// ══════════════════════════════════════════════
+window.setEditorFontSize = function(val) {
+  const px = val + 'px';
+  $('ed').style.fontSize  = px;
+  $('hl').style.fontSize  = px;
+  $('lnums').style.fontSize = px;
+  updateLnums();
+};
+
+// ══════════════════════════════════════════════
+// PLOT LIGHTBOX — click to pop out, pan + zoom
+// ══════════════════════════════════════════════
+let lb = { scale: 1, x: 0, y: 0, dragging: false, lastX: 0, lastY: 0,
+           pinching: false, lastDist: 0 };
+
+window.openPlotLb = function(src) {
+  const el   = $('plot-lb');
+  const img  = $('plot-lb-img');
+  const hint = document.getElementById('plot-lb-hint');
+  lb.scale = 1; lb.x = 0; lb.y = 0;
+  img.src = src;
+  img.onload = () => lbApply();
+  el.classList.add('open');
+  $('plot-lb-pct').textContent = '100%';
+  // Hint text
+  const isMobile = window.innerWidth < 768;
+  if (hint) {
+    hint.textContent = isMobile
+      ? 'Pinch to zoom · Drag to pan · Tap ✕ to close'
+      : 'Scroll to zoom · Drag to pan · Esc to close';
+    hint.style.opacity = '1';
+    hint.style.animation = 'none';
+    void hint.offsetWidth;
+    hint.style.animation = '';
+  }
+  // Esc to close
+  document._lbEsc = e => { if (e.key === 'Escape') closePlotLb(); };
+  document.addEventListener('keydown', document._lbEsc);
+};
+
+window.closePlotLb = function() {
+  $('plot-lb').classList.remove('open');
+  document.removeEventListener('keydown', document._lbEsc);
+};
+
+function lbApply() {
+  const inner = $('plot-lb-inner');
+  const img   = $('plot-lb-img');
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const natW = img.naturalWidth || vw * 0.9;
+  const natH = img.naturalHeight || vh * 0.9;
+  // Fit to viewport at scale=1
+  const baseScale = Math.min((vw * 0.92) / natW, (vh * 0.92) / natH, 1);
+  const dispW = natW * baseScale;
+  const dispH = natH * baseScale;
+  img.style.width  = dispW + 'px';
+  img.style.height = dispH + 'px';
+  inner.style.width  = dispW + 'px';
+  inner.style.height = dispH + 'px';
+  lbSetTransform();
+}
+
+function lbSetTransform() {
+  const inner = $('plot-lb-inner');
+  inner.style.transform = `translate(calc(-50% + ${lb.x}px), calc(-50% + ${lb.y}px)) scale(${lb.scale})`;
+  inner.style.left = '50%';
+  inner.style.top  = '50%';
+  inner.style.position = 'absolute';
+  $('plot-lb-pct').textContent = Math.round(lb.scale * 100) + '%';
+}
+
+window.lbZoom = function(factor) {
+  lb.scale = Math.max(0.2, Math.min(10, lb.scale * factor));
+  lbSetTransform();
+};
+
+// ── Mouse events (desktop)
+(function() {
+  const lb_el = () => $('plot-lb');
+
+  // Scroll to zoom
+  document.addEventListener('wheel', e => {
+    if (!lb_el().classList.contains('open')) return;
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.1 : 0.9;
+    lb.scale = Math.max(0.2, Math.min(10, lb.scale * factor));
+    lbSetTransform();
+  }, { passive: false });
+
+  // Mouse drag to pan
+  document.addEventListener('mousedown', e => {
+    if (!lb_el().classList.contains('open')) return;
+    if (e.target.id === 'plot-lb-close' || e.target.closest('#plot-lb-zoom')) return;
+    lb.dragging = true; lb.lastX = e.clientX; lb.lastY = e.clientY;
+    $('plot-lb-inner').classList.add('grabbing');
+  });
+  document.addEventListener('mousemove', e => {
+    if (!lb.dragging) return;
+    lb.x += e.clientX - lb.lastX;
+    lb.y += e.clientY - lb.lastY;
+    lb.lastX = e.clientX; lb.lastY = e.clientY;
+    lbSetTransform();
+  });
+  document.addEventListener('mouseup', () => {
+    lb.dragging = false;
+    const inner = $('plot-lb-inner');
+    if (inner) inner.classList.remove('grabbing');
+  });
+
+  // Click backdrop to close — set after DOM ready
+  document.addEventListener('DOMContentLoaded', () => {
+    const lbEl = document.getElementById('plot-lb');
+    if (lbEl) lbEl.addEventListener('click', e => {
+      if (e.target.id === 'plot-lb') closePlotLb();
+    });
+  });
+})();
+
+// ── Touch events (mobile) — drag + pinch-zoom
+(function() {
+  const getEl = () => $('plot-lb');
+  document.addEventListener('touchstart', e => {
+    if (!getEl().classList.contains('open')) return;
+    if (e.target.closest('#plot-lb-close') || e.target.closest('#plot-lb-zoom')) return;
+    if (e.touches.length === 1) {
+      lb.dragging = true;
+      lb.lastX = e.touches[0].clientX;
+      lb.lastY = e.touches[0].clientY;
+    } else if (e.touches.length === 2) {
+      lb.dragging = false;
+      lb.pinching = true;
+      lb.lastDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchmove', e => {
+    if (!getEl().classList.contains('open')) return;
+    if (e.touches.length === 1 && lb.dragging) {
+      lb.x += e.touches[0].clientX - lb.lastX;
+      lb.y += e.touches[0].clientY - lb.lastY;
+      lb.lastX = e.touches[0].clientX;
+      lb.lastY = e.touches[0].clientY;
+      lbSetTransform();
+    } else if (e.touches.length === 2 && lb.pinching) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const factor = dist / lb.lastDist;
+      lb.scale = Math.max(0.2, Math.min(10, lb.scale * factor));
+      lb.lastDist = dist;
+      lbSetTransform();
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchend', e => {
+    if (e.touches.length === 0) { lb.dragging = false; lb.pinching = false; }
+  });
+})();
+
 // ── Zoom: at 100% fit to container width; above that expand to natural size × factor
 window.zoomPlot = function(factor) {
-  plotZoom = Math.max(0.25, Math.min(5, plotZoom * factor));
+  plotZoom = Math.max(0.5, Math.min(5, plotZoom * factor));
   $('zoom-val').textContent = Math.round(plotZoom * 100) + '%';
 
   const wrap = $('plot-wrap');
   const view = $('plot-view');
   const img  = $('plot-img');
+  const viewW = view.clientWidth - 32; // subtract padding
 
   function apply() {
-    if (plotZoom <= 1) {
-      // Restore fit-to-view
-      applyPlotFit(wrap, img, view);
+    const nat = img.naturalWidth || viewW;
+    const scaled = Math.round(nat * plotZoom);
+    if (scaled <= viewW) {
+      // Fits inside — centre it, no overflow
+      img.style.width    = '100%';
+      img.style.maxWidth = scaled + 'px';
+      wrap.style.width   = '';
+      view.style.justifyContent = 'center';
     } else {
-      // Expand beyond natural size × zoom factor — scroll to explore
-      const scaledW = Math.round(img.naturalWidth  * plotZoom);
-      const scaledH = Math.round(img.naturalHeight * plotZoom);
-      wrap.style.width  = scaledW + 'px';
-      wrap.style.height = scaledH + 'px';
-      img.style.width   = '100%';
-      img.style.height  = '100%';
+      // Larger than view — allow scroll
+      img.style.width    = scaled + 'px';
+      img.style.maxWidth = 'none';
+      wrap.style.width   = scaled + 'px';
+      view.style.justifyContent = 'flex-start';
     }
+    img.style.height = 'auto';
+    wrap.style.height = '';
   }
   if (img.complete && img.naturalWidth) { apply(); } else { img.onload = apply; }
 };
@@ -1856,5 +2032,18 @@ updateHighlight();
 updateLnums();
 boot();
 </script>
+<!-- PLOT LIGHTBOX -->
+<div id="plot-lb">
+  <div id="plot-lb-inner">
+    <img id="plot-lb-img" src="" alt="plot">
+  </div>
+  <button id="plot-lb-close" onclick="closePlotLb()" title="Close (Esc)">✕</button>
+  <div id="plot-lb-zoom">
+    <button onclick="lbZoom(0.8)">−</button>
+    <span id="plot-lb-pct">100%</span>
+    <button onclick="lbZoom(1.25)">+</button>
+  </div>
+  <div id="plot-lb-hint" id="plot-lb-hint"></div>
+</div>
 </body>
 </html>
