@@ -144,13 +144,6 @@ body{height:100%;overflow:hidden;background:#141218;color:var(--on-s);
 .etb-icon{height:30px;padding:0 10px;justify-content:center;font-size:12px;flex-shrink:0;border-radius:20px;gap:4px}
 /* line numbers + editor */
 #ewrap{position:relative;flex:1;display:flex;overflow:hidden}
-#lnum-col{width:var(--lnum-w);background:var(--lnum-bg);border-right:1px solid var(--outv);
-  overflow:hidden;flex-shrink:0;position:relative;user-select:none}
-#lnums{position:absolute;top:0;right:0;
-  padding:14px 4px 200px 2px;
-  font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.7;
-  color:var(--lnum-fg);text-align:right;white-space:pre;pointer-events:none;
-  will-change:transform}
 .lnum-active{color:var(--pri);font-weight:500}
 /* Syntax highlight container */
 #ed-container{flex:1;position:relative;overflow:hidden;background:var(--code-bg)}
@@ -246,8 +239,10 @@ body{height:100%;overflow:hidden;background:#141218;color:var(--on-s);
   backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
   display:none;overflow:hidden;touch-action:none}
 #plot-lb.open{display:block}
-#plot-lb-card{position:absolute;background:white;border-radius:12px;overflow:hidden;
-  box-shadow:0 24px 80px rgba(0,0,0,.7);cursor:grab;will-change:transform}
+/* white card — gives the plot its white background in the lightbox */
+#plot-lb-card{position:absolute;background:#ffffff;border-radius:12px;overflow:hidden;
+  box-shadow:0 24px 80px rgba(0,0,0,.7);cursor:grab;will-change:left,top;
+  transform-origin:0 0}
 #plot-lb-card.grabbing{cursor:grabbing}
 #plot-lb-card img{display:block;width:100%;height:100%;
   pointer-events:none;user-select:none;-webkit-user-select:none}
@@ -427,7 +422,6 @@ body{height:100%;overflow:hidden;background:#141218;color:var(--on-s);
       <input type="file" id="script-input" accept=".r,.R,.rscript,.txt" style="display:none" onchange="onScriptOpen(event)">
     </div>
     <div id="ewrap">
-      <div id="lnum-col"><div id="lnums"></div></div>
       <div id="ed-container">
         <pre id="hl" aria-hidden="true"></pre>
         <textarea id="ed" spellcheck="false" autocorrect="off" autocapitalize="none" autocomplete="off"># Welcome to R-IDE — powered by WebR
@@ -471,7 +465,6 @@ grid(col = "grey80")
       <button class="btn btn-tonal" onclick="savePlot()">⬇ Save</button>
       <span id="pcnt"></span>
     </div>
-
     <div id="plot-tabs"></div>
     <div id="plot-view">
       <div id="plot-empty">
@@ -519,7 +512,7 @@ grid(col = "grey80")
         <div class="sg-t">Editor</div>
         <div class="s-row">
           <div>Font Size</div>
-          <select class="pill-sel" onchange="const s=this.value+'px';document.getElementById('ed').style.fontSize=s;document.getElementById('hl').style.fontSize=s;updateLnums()">
+          <select class="pill-sel" onchange="const s=this.value+'px';document.getElementById('ed').style.fontSize=s;document.getElementById('hl').style.fontSize=s">
             <option value="11">11px</option><option value="12">12px</option>
             <option value="13" selected>13px</option><option value="14">14px</option>
             <option value="16">16px</option><option value="18">18px</option>
@@ -733,7 +726,26 @@ async function boot() {
     setLoad(8, 'Creating WebR instance…');
     webR = new WebR();
 
-    setLoad(18, 'Downloading WebR (~10 MB first time)…');
+    setLoad(18, 'Downloading WebR…');
+    // Show live download progress in MB
+    (function trackDownload() {
+      if (!performance || !performance.getEntriesByType) return;
+      let lastPct = 18;
+      const iv = setInterval(() => {
+        if (!$('lo') || $('lo').classList.contains('gone')) { clearInterval(iv); return; }
+        const entries = performance.getEntriesByType('resource')
+          .filter(r => r.name.includes('webr') || r.name.includes('wasm') || r.name.includes('r-wasm'));
+        let loaded = 0, total = 0;
+        entries.forEach(r => {
+          loaded += r.transferSize || r.encodedBodySize || 0;
+          total  += r.decodedBodySize || r.encodedBodySize || 0;
+        });
+        const mb = (loaded / 1048576).toFixed(1);
+        const pct = Math.min(85, 18 + (loaded / (10 * 1048576)) * 67);
+        if (pct > lastPct) { lastPct = pct; $('lo-bar').style.width = pct + '%'; }
+        if (loaded > 0) $('lo-msg').textContent = 'Downloading WebR… ' + mb + ' MB';
+      }, 400);
+    })();
 
     // 90-second timeout — if WebR hangs, show a useful error
     const initTimeout = new Promise((_, reject) =>
@@ -753,7 +765,6 @@ async function boot() {
     log('✓ R is running via WebR!', 'ok');
     log('ℹ Ctrl+Enter or ▶ Run to execute.  Plots → Plots tab.', 'inf');
     renderPkgs('');
-    updateLnums();
 
   } catch(err) {
     console.error('[R-IDE] Boot failed:', err);
@@ -827,7 +838,6 @@ window.runSel = function() {
 window.edClear = () => {
   $('ed').value = '';
   updateHighlight();
-  updateLnums();
 };
 function setBtns(en) {
   $('runbtn').disabled  = !en;
@@ -860,23 +870,6 @@ window.onRepl = async function(e) {
 };
 
 // ══════════════════════════════════════════════
-// LINE NUMBERS — synced with textarea
-// ══════════════════════════════════════════════
-const lnums  = $('lnums');
-const lnCol  = $('lnum-col');
-
-window.updateLnums = function() {
-  const lines = $('ed').value.split('\n');
-  const count = lines.length;
-  if (lnums._lastCount === count) return;
-  lnums._lastCount = count;
-  lnums.textContent = Array.from({length: count}, (_, i) => i + 1).join('\n');
-};
-
-$('ed').addEventListener('scroll', () => {
-  lnums.style.transform = `translateY(${-$('ed').scrollTop}px)`;
-});
-
 // ══════════════════════════════════════════════
 // PLOTS — tab carousel + zoom
 // ══════════════════════════════════════════════
@@ -980,33 +973,37 @@ window.savePlot = function() {
 
 // ══════════════════════════════════════════════
 // PLOT LIGHTBOX
+// Card is positioned using absolute left/top + scale(s) with transform-origin 0 0.
+// cx/cy = viewport coords of the card's top-left corner (before scaling).
+// Zooming toward point P: keep P fixed by adjusting cx/cy.
 // ══════════════════════════════════════════════
-// State: card position (cx,cy) is the center of the card in viewport coords
-const LB = { open:false, scale:1, cx:0, cy:0, w:0, h:0,
-             ptrs:{}, lastMidX:0, lastMidY:0, lastDist:0 };
+const LB = {
+  open:false, scale:1,
+  cx:0, cy:0,   // card top-left in viewport
+  w:0, h:0,     // base card size (unscaled)
+  ptrs:{},      // active pointers {id:{x,y}}
+  lastMidX:0, lastMidY:0, lastDist:0
+};
 
-function lbPos() {
-  // Position card so its center is at (cx, cy)
+function lbRender() {
   const card = $('plot-lb-card');
-  card.style.left   = (LB.cx - LB.w*LB.scale/2) + 'px';
-  card.style.top    = (LB.cy - LB.h*LB.scale/2) + 'px';
-  card.style.width  = LB.w + 'px';
-  card.style.height = LB.h + 'px';
+  card.style.left      = LB.cx + 'px';
+  card.style.top       = LB.cy + 'px';
+  card.style.width     = LB.w  + 'px';
+  card.style.height    = LB.h  + 'px';
   card.style.transform = 'scale(' + LB.scale + ')';
-  card.style.transformOrigin = '0 0';
-  // Recalc: when we apply scale(s) with origin 0,0 the card renders at
-  // left + w*s wide, so center = left + w*s/2. We set left = cx - w*s/2. ✓
-  $('plot-lb-pct').textContent = Math.round(LB.scale*100) + '%';
+  $('plot-lb-pct').textContent = Math.round(LB.scale * 100) + '%';
 }
 
-// Zoom toward a viewport point (px, py)
-function lbZoomAt(factor, px, py) {
-  const newScale = Math.max(0.1, Math.min(10, LB.scale * factor));
-  // Adjust cx,cy so the point (px,py) stays fixed on screen
-  LB.cx = px + (LB.cx - px) * (newScale / LB.scale);
-  LB.cy = py + (LB.cy - py) * (newScale / LB.scale);
-  LB.scale = newScale;
-  lbPos();
+// Zoom by factor toward viewport point (ox, oy)
+function lbZoomAt(factor, ox, oy) {
+  const ns = Math.max(0.1, Math.min(10, LB.scale * factor));
+  // Point ox,oy is at distance (ox-cx, oy-cy) from card origin in viewport.
+  // After scaling, the same point should remain: cx' + (ox-cx)*ns/scale = ox
+  LB.cx = ox - (ox - LB.cx) * (ns / LB.scale);
+  LB.cy = oy - (oy - LB.cy) * (ns / LB.scale);
+  LB.scale = ns;
+  lbRender();
 }
 
 window.openPlotLb = function(src) {
@@ -1016,22 +1013,21 @@ window.openPlotLb = function(src) {
   const img     = card.querySelector('img');
   overlay.classList.add('open');
   $('plot-lb-pct').textContent = '100%';
-  // Hint
   $('plot-lb-hint').textContent = window.innerWidth < 768
     ? 'Pinch to zoom  ·  Drag to pan  ·  Tap ✕ to close'
     : 'Scroll to zoom  ·  Drag to pan  ·  Esc to close';
   img.onload = function() {
     const vw = overlay.clientWidth, vh = overlay.clientHeight;
-    const s  = Math.min(vw*0.88/img.naturalWidth, vh*0.88/img.naturalHeight, 1);
+    const s  = Math.min(vw * 0.88 / img.naturalWidth, vh * 0.88 / img.naturalHeight, 1);
     LB.w = Math.round(img.naturalWidth  * s);
     LB.h = Math.round(img.naturalHeight * s);
     LB.scale = 1;
-    // Start centered
-    LB.cx = vw/2; LB.cy = vh/2;
-    lbPos();
+    LB.cx = (vw - LB.w) / 2;   // center horizontally
+    LB.cy = (vh - LB.h) / 2;   // center vertically
+    lbRender();
   };
   img.src = ''; img.src = src;
-  document._lbEsc = e => { if (e.key==='Escape') closePlotLb(); };
+  document._lbEsc = e => { if (e.key === 'Escape') closePlotLb(); };
   document.addEventListener('keydown', document._lbEsc);
 };
 
@@ -1041,79 +1037,69 @@ window.closePlotLb = function() {
   document.removeEventListener('keydown', document._lbEsc);
 };
 
-// Button zoom — zoom toward screen center
+// Button zoom toward screen center
 window.lbZoom = function(f) {
   const ov = $('plot-lb');
-  lbZoomAt(f, ov.clientWidth/2, ov.clientHeight/2);
+  lbZoomAt(f, ov.clientWidth / 2, ov.clientHeight / 2);
 };
 
-// Scroll to zoom toward cursor
+// Desktop: scroll to zoom toward cursor
 document.addEventListener('wheel', function(e) {
   if (!LB.open) return;
   e.preventDefault();
   lbZoomAt(e.deltaY < 0 ? 1.1 : 0.9, e.clientX, e.clientY);
-}, { passive:false });
+}, { passive: false });
 
-// Pointer events — unified mouse + touch
+// Pointer events (mouse + touch unified)
 document.addEventListener('pointerdown', function(e) {
   if (!LB.open) return;
-  if (e.target.id==='plot-lb-close' || e.target.closest('#plot-lb-bar')) return;
-  if (e.target.id==='plot-lb') { closePlotLb(); return; }
+  if (e.target.id === 'plot-lb-close' || e.target.closest('#plot-lb-bar')) return;
+  if (e.target.id === 'plot-lb') { closePlotLb(); return; }
   e.preventDefault();
   e.target.setPointerCapture(e.pointerId);
-  LB.ptrs[e.pointerId] = {x:e.clientX, y:e.clientY};
+  LB.ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
   const ids = Object.keys(LB.ptrs);
   if (ids.length === 2) {
-    // Record midpoint and distance at start of pinch
     const a = LB.ptrs[ids[0]], b = LB.ptrs[ids[1]];
-    LB.lastMidX = (a.x+b.x)/2; LB.lastMidY = (a.y+b.y)/2;
-    LB.lastDist = Math.hypot(a.x-b.x, a.y-b.y);
+    LB.lastMidX = (a.x + b.x) / 2;
+    LB.lastMidY = (a.y + b.y) / 2;
+    LB.lastDist = Math.hypot(a.x - b.x, a.y - b.y);
   }
   $('plot-lb-card').classList.add('grabbing');
-}, { passive:false });
+}, { passive: false });
 
 document.addEventListener('pointermove', function(e) {
   if (!LB.open || !LB.ptrs[e.pointerId]) return;
-  LB.ptrs[e.pointerId] = {x:e.clientX, y:e.clientY};
+  const prev = { ...LB.ptrs[e.pointerId] };
+  LB.ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
   const ids = Object.keys(LB.ptrs);
 
   if (ids.length === 1) {
-    // Pan: single pointer drag
-    const prev = LB.ptrs[ids[0]];
-    // prev was just updated above — need delta from last frame
-    // We track delta by storing last position separately
-    const last = LB._last || {x:e.clientX, y:e.clientY};
-    LB.cx += e.clientX - last.x;
-    LB.cy += e.clientY - last.y;
-    lbPos();
+    // Pan
+    LB.cx += e.clientX - prev.x;
+    LB.cy += e.clientY - prev.y;
+    lbRender();
   } else if (ids.length === 2) {
-    // Pinch: zoom toward midpoint of two fingers
+    // Pinch — zoom toward midpoint of two fingers
     const a = LB.ptrs[ids[0]], b = LB.ptrs[ids[1]];
-    const midX = (a.x+b.x)/2, midY = (a.y+b.y)/2;
-    const dist = Math.hypot(a.x-b.x, a.y-b.y);
-    if (LB.lastDist > 0) {
-      const factor = dist / LB.lastDist;
-      // Pan by midpoint movement
-      LB.cx += midX - LB.lastMidX;
-      LB.cy += midY - LB.lastMidY;
-      // Zoom toward midpoint
-      lbZoomAt(factor, midX, midY);
-    }
+    const midX = (a.x + b.x) / 2, midY = (a.y + b.y) / 2;
+    const dist = Math.hypot(a.x - b.x, a.y - b.y);
+    // Pan by midpoint delta
+    LB.cx += midX - LB.lastMidX;
+    LB.cy += midY - LB.lastMidY;
+    // Zoom toward midpoint
+    if (LB.lastDist > 0) lbZoomAt(dist / LB.lastDist, midX, midY);
     LB.lastMidX = midX; LB.lastMidY = midY;
     LB.lastDist = dist;
   }
-  LB._last = {x:e.clientX, y:e.clientY};
 });
 
 document.addEventListener('pointerup', function(e) {
   delete LB.ptrs[e.pointerId];
-  LB._last = null;
   if (Object.keys(LB.ptrs).length === 0)
     $('plot-lb-card') && $('plot-lb-card').classList.remove('grabbing');
 });
-document.addEventListener('pointercancel', function(e) {
-  delete LB.ptrs[e.pointerId]; LB._last = null;
-});
+document.addEventListener('pointercancel', function(e) { delete LB.ptrs[e.pointerId]; });
 
 // ══════════════════════════════════════════════
 // FILE MANAGER
@@ -1715,9 +1701,9 @@ function posAC(ta) {
   const top   = lines.length * lh - ta.scrollTop;
   const charW = parseFloat(getComputedStyle(ta).fontSize) * 0.6 || 7.8;
   const curX  = 16 + lines[lines.length-1].length * charW; // 16 = ed padding-left
-  const left  = parseInt(getComputedStyle($('lnum-col')).width || '46') + curX;
+  const left  = curX;
   acBox.style.top  = Math.max(0, Math.min(top,   ta.clientHeight - 230)) + 'px';
-  acBox.style.left = Math.max(46, Math.min(left,  ewrap.clientWidth - 280)) + 'px';
+  acBox.style.left = Math.max(8, Math.min(left,  ewrap.clientWidth - 280)) + 'px';
 }
 
 function hiAC(i) {
@@ -1743,7 +1729,7 @@ function applyAC(name) {
   ed.value = val.substring(0, start) + ins + val.substring(pos);
   ed.selectionStart = ed.selectionEnd = bare.includes(name) ? start + ins.length : start + name.length + 1;
   hideAC();
-  setTimeout(() => { updateHighlight(); updateLnums(); }, 0);
+  setTimeout(() => { updateHighlight(); }, 0);
   ed.focus();
 }
 
@@ -1761,7 +1747,7 @@ window.onScriptOpen = function(e) {
   const reader = new FileReader();
   reader.onload = ev => {
     $('ed').value = ev.target.result;
-    updateHighlight(); updateLnums();
+    updateHighlight();
     e.target.value = '';
   };
   reader.readAsText(file);
@@ -1837,15 +1823,12 @@ ed.addEventListener('input', e => {
   }
 
   updateHighlight();
-  updateLnums();
   showAC(ed);
 });
 
 ed.addEventListener('blur',  () => setTimeout(hideAC, 180));
 ed.addEventListener('click', hideAC);
 ed.addEventListener('scroll', () => {
-  // Sync line numbers scroll
-  lnums.style.transform = `translateY(${-ed.scrollTop}px)`;
   // Sync highlight scroll
   const hl = $('hl');
   if (hl) { hl.scrollTop = ed.scrollTop; hl.scrollLeft = ed.scrollLeft; }
@@ -1881,7 +1864,7 @@ ed.addEventListener('keydown', e => {
       ed.value = ed.value.substring(0,s) + '  ' + ed.value.substring(s);
       ed.selectionStart = ed.selectionEnd = s + 2;
     }
-    updateHighlight(); updateLnums(); return;
+    updateHighlight(); return;
   }
 
   if (!bpOn) return;
@@ -1893,7 +1876,7 @@ ed.addEventListener('keydown', e => {
   if (PAIRS[e.key]) {
     if ((e.key==='"'||e.key==="'") && next===e.key && !sel) {
       e.preventDefault(); ed.selectionStart = ed.selectionEnd = pos+1;
-      setTimeout(() => { updateHighlight(); updateLnums(); }, 0); return;
+      setTimeout(() => { updateHighlight(); }, 0); return;
     }
     e.preventDefault();
     const cl = PAIRS[e.key];
@@ -1904,12 +1887,12 @@ ed.addEventListener('keydown', e => {
       ed.value = val.substring(0,pos)+e.key+cl+val.substring(pos);
       ed.selectionStart = ed.selectionEnd = pos+1;
     }
-    setTimeout(() => { updateHighlight(); updateLnums(); }, 0);
+    setTimeout(() => { updateHighlight(); }, 0);
     showAC(ed); return;
   }
   if ((e.key===')'&&next===')')||(e.key===']'&&next===']')||(e.key==='}'&&next==='}')) {
     if (!sel) { e.preventDefault(); ed.selectionStart = ed.selectionEnd = pos+1;
-      setTimeout(() => { updateHighlight(); updateLnums(); }, 0); return; }
+      setTimeout(() => { updateHighlight(); }, 0); return; }
   }
   if (e.key==='Backspace' && !sel) {
     const prev = val[pos-1];
@@ -1917,7 +1900,7 @@ ed.addEventListener('keydown', e => {
       e.preventDefault();
       ed.value = val.substring(0,pos-1)+val.substring(pos+1);
       ed.selectionStart = ed.selectionEnd = pos-1;
-      setTimeout(() => { updateHighlight(); updateLnums(); }, 0); return;
+      setTimeout(() => { updateHighlight(); }, 0); return;
     }
   }
   if (e.key==='Enter' && !sel && val[pos-1]==='{' && val[pos]==='}') {
@@ -1929,7 +1912,7 @@ ed.addEventListener('keydown', e => {
     ed.selectionStart = ed.selectionEnd = pos+indent.length+3;
   }
   // Update line numbers after any change
-  setTimeout(() => { updateHighlight(); updateLnums(); }, 0);
+  setTimeout(() => { updateHighlight(); }, 0);
 });
 
 // ── Tab switching
@@ -1953,7 +1936,6 @@ window.resetSession = async function() {
 
 // ── Initial line numbers + boot
 updateHighlight();
-updateLnums();
 boot();
 </script>
 <!-- PLOT LIGHTBOX -->
