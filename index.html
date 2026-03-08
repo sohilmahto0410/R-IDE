@@ -212,6 +212,7 @@ body{height:100%;overflow:hidden;background:#141218;color:var(--on-s);
 #ptb{display:flex;gap:7px;padding:7px 10px;background:var(--s2);
   border-bottom:1px solid var(--outv);flex-shrink:0;align-items:center;flex-wrap:wrap}
 #pcnt{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--out);margin-left:auto}
+
 /* plot chip tabs */
 #plot-tabs{display:flex;align-items:center;gap:6px;padding:7px 10px;
   background:var(--s2);border-bottom:1px solid var(--outv);
@@ -242,25 +243,28 @@ body{height:100%;overflow:hidden;background:#141218;color:var(--on-s);
 #plot-wrap img{display:block;width:100%;height:auto}
 
 /* ── PLOT LIGHTBOX ── */
-#plot-lb{position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.9);
-  display:none;align-items:center;justify-content:center;
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  overflow:hidden}
-#plot-lb.open{display:flex}
-#plot-lb-img{display:block;border-radius:10px;
-  box-shadow:0 24px 80px rgba(0,0,0,.8);
-  transform-origin:center center;will-change:transform;
-  max-width:none;max-height:none;touch-action:none;
-  user-select:none;-webkit-user-select:none;pointer-events:none}
+#plot-lb{position:fixed;inset:0;z-index:9000;
+  background:rgba(0,0,0,.88);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  display:none;overflow:hidden;touch-action:none}
+#plot-lb.open{display:block}
+/* white card that wraps image — gives plot its white background */
+#plot-lb-card{position:absolute;top:50%;left:50%;
+  background:white;border-radius:12px;overflow:hidden;
+  box-shadow:0 24px 80px rgba(0,0,0,.7);
+  transform-origin:0 0;cursor:grab}
+#plot-lb-card.grabbing{cursor:grabbing}
+#plot-lb-card img{display:block;width:100%;height:100%;pointer-events:none;user-select:none}
+/* close button */
 #plot-lb-close{position:fixed;top:14px;right:14px;width:40px;height:40px;
   border-radius:50%;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);
   color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;
-  justify-content:center;z-index:9001;transition:background .15s}
-#plot-lb-close:hover{background:rgba(255,255,255,.28)}
+  justify-content:center;z-index:9002;transition:background .15s}
+#plot-lb-close:hover{background:rgba(255,255,255,.3)}
+/* bottom bar */
 #plot-lb-bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
-  display:flex;align-items:center;gap:10px;background:rgba(20,18,24,.92);
-  border:1px solid rgba(255,255,255,.12);border-radius:24px;padding:8px 18px;
-  z-index:9001;gap:12px}
+  display:flex;align-items:center;gap:12px;
+  background:rgba(20,18,24,.92);border:1px solid rgba(255,255,255,.12);
+  border-radius:24px;padding:8px 18px;z-index:9002}
 #plot-lb-bar button{width:32px;height:32px;border-radius:50%;
   border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);
   color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;
@@ -268,12 +272,13 @@ body{height:100%;overflow:hidden;background:#141218;color:var(--on-s);
 #plot-lb-bar button:hover{background:rgba(255,255,255,.25)}
 #plot-lb-pct{font-family:'JetBrains Mono',monospace;font-size:12px;
   color:#fff;min-width:44px;text-align:center}
+/* hint */
 #plot-lb-hint{position:fixed;top:14px;left:50%;transform:translateX(-50%);
-  font-size:11px;color:rgba(255,255,255,.55);font-family:'Google Sans',sans-serif;
+  font-size:11px;color:rgba(255,255,255,.6);font-family:'Google Sans',sans-serif;
   background:rgba(0,0,0,.5);padding:4px 14px;border-radius:12px;
   pointer-events:none;white-space:nowrap;
-  animation:lbHintFade 4s ease forwards}
-@keyframes lbHintFade{0%,60%{opacity:1}100%{opacity:0}}
+  animation:lbFade 4s ease forwards}
+@keyframes lbFade{0%,50%{opacity:1}100%{opacity:0}}
 
 /* ── FILES ── */
 #fdrop{margin:12px;border:2px dashed var(--outv);border-radius:var(--r-xl);
@@ -939,27 +944,21 @@ function showPlot(idx) {
   wrap.style.width  = '';
   wrap.style.height = '';
 
+  // Size wrap to fit view on desktop; fill width on mobile
   pi.onload = function() {
-    const natW = pi.naturalWidth;
-    const natH = pi.naturalHeight;
+    const natW = pi.naturalWidth, natH = pi.naturalHeight;
     if (!natW || !natH) return;
-    const availW = view.clientWidth  - 32;
-    const availH = view.clientHeight - 32;
-    const isMob  = window.innerWidth < 768;
-    if (isMob) {
-      // Mobile: fill width, natural aspect ratio
+    if (window.innerWidth >= 768) {
+      const aw = view.clientWidth - 32, ah = view.clientHeight - 32;
+      const s  = Math.min(aw / natW, ah / natH, 1);
+      wrap.style.width  = Math.floor(natW * s) + 'px';
+      wrap.style.height = Math.floor(natH * s) + 'px';
+    } else {
       wrap.style.width  = '100%';
       wrap.style.height = '';
-    } else {
-      // Desktop: fit entire plot inside available area
-      const scale = Math.min(availW / natW, availH / natH, 1);
-      wrap.style.width  = Math.floor(natW * scale) + 'px';
-      wrap.style.height = Math.floor(natH * scale) + 'px';
     }
   };
-  // Click to open lightbox
   wrap.onclick = () => openPlotLb(plots[idx].src);
-
   pi.src = plots[idx].src;
   renderPlotTabs();
 }
@@ -996,126 +995,114 @@ window.savePlot = function() {
 };
 
 // ══════════════════════════════════════════════
-// PLOT LIGHTBOX
+// PLOT LIGHTBOX — unified touch+mouse (same code path)
 // ══════════════════════════════════════════════
-const LB = { scale:1, tx:0, ty:0, baseW:0, baseH:0,
-             dragging:false, mx:0, my:0,
-             pinching:false, pd:0 };
+const LB = {
+  scale:1, tx:0, ty:0,      // current transform
+  baseW:0, baseH:0,          // fitted image size
+  active:false,
+  // pointer tracking (works for both mouse and touch)
+  ptrs:{},                   // pointerId → {x,y}
+  lastDist:0                 // for pinch
+};
+
+function lbApply() {
+  const card = $('plot-lb-card');
+  // card is positioned at center; we use translate(-50%,-50%) + our tx/ty + scale
+  card.style.transform =
+    `translate(calc(-50% + ${LB.tx}px), calc(-50% + ${LB.ty}px)) scale(${LB.scale})`;
+  $('plot-lb-pct').textContent = Math.round(LB.scale * 100) + '%';
+}
 
 window.openPlotLb = function(src) {
+  LB.scale = 1; LB.tx = 0; LB.ty = 0; LB.active = true; LB.ptrs = {};
   const overlay = $('plot-lb');
-  const img     = $('plot-lb-img');
-  const hint    = $('plot-lb-hint');
-  // Reset state
-  LB.scale = 1; LB.tx = 0; LB.ty = 0;
-  img.src = '';
+  const card    = $('plot-lb-card');
+  const img     = card.querySelector('img');
   overlay.classList.add('open');
-
-  img.onload = function() {
-    // Size image to fit viewport at scale=1
-    const vw = overlay.clientWidth;
-    const vh = overlay.clientHeight;
-    const natW = img.naturalWidth;
-    const natH = img.naturalHeight;
-    const fit  = Math.min(vw * 0.9 / natW, vh * 0.9 / natH, 1);
-    LB.baseW = Math.round(natW * fit);
-    LB.baseH = Math.round(natH * fit);
-    img.style.width  = LB.baseW + 'px';
-    img.style.height = LB.baseH + 'px';
-    lbApply();
-  };
-  img.src = src;
   $('plot-lb-pct').textContent = '100%';
+  card.style.transform = 'translate(-50%, -50%) scale(1)';
 
   // Hint
   const mob = window.innerWidth < 768;
-  hint.textContent = mob
+  $('plot-lb-hint').textContent = mob
     ? 'Pinch to zoom  ·  Drag to pan  ·  Tap ✕ to close'
     : 'Scroll to zoom  ·  Drag to pan  ·  Esc to close';
+
+  img.onload = function() {
+    const vw = overlay.clientWidth, vh = overlay.clientHeight;
+    const s  = Math.min(vw * 0.88 / img.naturalWidth, vh * 0.88 / img.naturalHeight, 1);
+    LB.baseW = Math.round(img.naturalWidth  * s);
+    LB.baseH = Math.round(img.naturalHeight * s);
+    card.style.width  = LB.baseW + 'px';
+    card.style.height = LB.baseH + 'px';
+    lbApply();
+  };
+  img.src = '';
+  img.src = src;
 
   document._lbEsc = e => { if (e.key === 'Escape') closePlotLb(); };
   document.addEventListener('keydown', document._lbEsc);
 };
 
 window.closePlotLb = function() {
+  LB.active = false; LB.ptrs = {};
   $('plot-lb').classList.remove('open');
   document.removeEventListener('keydown', document._lbEsc);
 };
 
-function lbApply() {
-  const img = $('plot-lb-img');
-  img.style.transform = `translate(${LB.tx}px, ${LB.ty}px) scale(${LB.scale})`;
-  $('plot-lb-pct').textContent = Math.round(LB.scale * 100) + '%';
-}
-
-window.lbZoom = function(factor) {
-  LB.scale = Math.max(0.2, Math.min(10, LB.scale * factor));
+window.lbZoom = function(f) {
+  LB.scale = Math.max(0.1, Math.min(10, LB.scale * f));
   lbApply();
 };
 
-// Close on backdrop click
-document.addEventListener('click', function(e) {
-  if (e.target && e.target.id === 'plot-lb') closePlotLb();
+// ── Pointer events (handles mouse AND touch uniformly)
+document.addEventListener('pointerdown', function(e) {
+  if (!LB.active) return;
+  if (e.target.id === 'plot-lb-close' || e.target.closest('#plot-lb-bar')) return;
+  if (e.target.id === 'plot-lb') { closePlotLb(); return; } // tap backdrop
+  e.target.setPointerCapture && e.target.setPointerCapture(e.pointerId);
+  LB.ptrs[e.pointerId] = {x: e.clientX, y: e.clientY};
+  $('plot-lb-card').classList.add('grabbing');
 });
 
-// ── Desktop: scroll=zoom, mousedown=pan
+document.addEventListener('pointermove', function(e) {
+  if (!LB.active || !LB.ptrs[e.pointerId]) return;
+  const ids = Object.keys(LB.ptrs);
+  if (ids.length === 1) {
+    // pan
+    LB.tx += e.clientX - LB.ptrs[e.pointerId].x;
+    LB.ty += e.clientY - LB.ptrs[e.pointerId].y;
+    lbApply();
+  } else if (ids.length === 2) {
+    // pinch-zoom: compare new distance with old
+    const other = LB.ptrs[ids.find(id => id != e.pointerId)];
+    const cur   = {x: e.clientX, y: e.clientY};
+    const prev  = LB.ptrs[e.pointerId];
+    const newD  = Math.hypot(cur.x - other.x, cur.y - other.y);
+    const oldD  = Math.hypot(prev.x - other.x, prev.y - other.y);
+    if (oldD > 0) LB.scale = Math.max(0.1, Math.min(10, LB.scale * (newD / oldD)));
+    lbApply();
+  }
+  LB.ptrs[e.pointerId] = {x: e.clientX, y: e.clientY};
+});
+
+document.addEventListener('pointerup', function(e) {
+  delete LB.ptrs[e.pointerId];
+  if (Object.keys(LB.ptrs).length === 0)
+    $('plot-lb-card') && $('plot-lb-card').classList.remove('grabbing');
+});
+document.addEventListener('pointercancel', function(e) {
+  delete LB.ptrs[e.pointerId];
+});
+
+// Scroll-to-zoom on desktop
 document.addEventListener('wheel', function(e) {
-  if (!$('plot-lb').classList.contains('open')) return;
+  if (!LB.active) return;
   e.preventDefault();
-  LB.scale = Math.max(0.2, Math.min(10, LB.scale * (e.deltaY < 0 ? 1.1 : 0.9)));
+  LB.scale = Math.max(0.1, Math.min(10, LB.scale * (e.deltaY < 0 ? 1.1 : 0.9)));
   lbApply();
 }, { passive: false });
-
-document.addEventListener('mousedown', function(e) {
-  if (!$('plot-lb').classList.contains('open')) return;
-  if (e.target.closest('#plot-lb-bar') || e.target.id === 'plot-lb-close') return;
-  if (e.target.id === 'plot-lb') return; // backdrop closes, not pans
-  LB.dragging = true; LB.mx = e.clientX; LB.my = e.clientY;
-  e.preventDefault();
-});
-document.addEventListener('mousemove', function(e) {
-  if (!LB.dragging) return;
-  LB.tx += e.clientX - LB.mx; LB.ty += e.clientY - LB.my;
-  LB.mx = e.clientX; LB.my = e.clientY;
-  lbApply();
-});
-document.addEventListener('mouseup', function() { LB.dragging = false; });
-
-// ── Mobile: touch drag=pan, 2-finger=pinch-zoom
-document.addEventListener('touchstart', function(e) {
-  if (!$('plot-lb').classList.contains('open')) return;
-  if (e.target.closest('#plot-lb-bar') || e.target.id === 'plot-lb-close') return;
-  if (e.touches.length === 1) {
-    LB.dragging = true; LB.pinching = false;
-    LB.mx = e.touches[0].clientX; LB.my = e.touches[0].clientY;
-  } else if (e.touches.length === 2) {
-    LB.dragging = false; LB.pinching = true;
-    LB.pd = Math.hypot(
-      e.touches[0].clientX - e.touches[1].clientX,
-      e.touches[0].clientY - e.touches[1].clientY);
-  }
-}, { passive: true });
-
-document.addEventListener('touchmove', function(e) {
-  if (!$('plot-lb').classList.contains('open')) return;
-  if (e.touches.length === 1 && LB.dragging) {
-    LB.tx += e.touches[0].clientX - LB.mx;
-    LB.ty += e.touches[0].clientY - LB.my;
-    LB.mx = e.touches[0].clientX; LB.my = e.touches[0].clientY;
-    lbApply();
-  } else if (e.touches.length === 2 && LB.pinching) {
-    const d = Math.hypot(
-      e.touches[0].clientX - e.touches[1].clientX,
-      e.touches[0].clientY - e.touches[1].clientY);
-    LB.scale = Math.max(0.2, Math.min(10, LB.scale * (d / LB.pd)));
-    LB.pd = d;
-    lbApply();
-  }
-}, { passive: true });
-
-document.addEventListener('touchend', function(e) {
-  if (e.touches.length === 0) { LB.dragging = false; LB.pinching = false; }
-}, { passive: true });
 
 // ══════════════════════════════════════════════
 // FILE MANAGER
@@ -1963,7 +1950,7 @@ boot();
 <div id="plot-lb">
   <button id="plot-lb-close" onclick="closePlotLb()">✕</button>
   <div id="plot-lb-hint"></div>
-  <img id="plot-lb-img" src="" alt="plot">
+  <div id="plot-lb-card"><img src="" alt="plot"></div>
   <div id="plot-lb-bar">
     <button onclick="lbZoom(0.8)">−</button>
     <span id="plot-lb-pct">100%</span>
